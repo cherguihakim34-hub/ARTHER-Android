@@ -1,141 +1,124 @@
 
 const $ = (id) => document.getElementById(id);
 
-const output = $("output");
-const status = $("status");
+const report = $("report");
+const connection = $("connection");
 
-const savedUrl = localStorage.getItem("arther_api_base") || "";
-const baseInput = $("apiUrl");
+let apiUrl = localStorage.getItem("arther_api_base") || "";
 
-if (baseInput) baseInput.value = savedUrl;
+function getApiUrl() {
+  if (!apiUrl) {
+    const entered = prompt("أدخل رابط خادم ARTHER:");
+    if (!entered) throw new Error("أدخل رابط الخادم أولاً");
 
-function apiBase() {
-  const value = (baseInput?.value || "").trim().replace(/\/$/, "");
-
-  if (!value) {
-    throw new Error("أدخل رابط خادم ARTHER أولاً");
+    apiUrl = entered.trim().replace(/\/$/, "");
+    localStorage.setItem("arther_api_base", apiUrl);
   }
-
-  localStorage.setItem("arther_api_base", value);
-  return value;
+  return apiUrl;
 }
 
-async function request(path, data) {
-  const response = await fetch(apiBase() + path, {
+async function callApi(path, data) {
+  const response = await fetch(getApiUrl() + path, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
   });
 
   const result = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(result.detail || "حدث خطأ في الخادم");
+    throw new Error(result.detail || "خطأ في الاتصال بالخادم");
   }
 
   return result;
 }
 
 function showError(error) {
-  if (output) output.textContent = "خطأ: " + error.message;
-  if (status) status.textContent = "غير متصل";
+  report.classList.remove("hidden");
+  report.textContent = "خطأ: " + error.message;
+  connection.textContent = "غير متصل";
 }
 
-// تحليل الأسئلة والفرضيات
-const analyzeButton = $("analyzeBtn");
+async function checkConnection() {
+  try {
+    const response = await fetch(getApiUrl() + "/health");
+    if (!response.ok) throw new Error();
 
-if (analyzeButton) {
-  analyzeButton.addEventListener("click", async () => {
-    const question = $("question")?.value?.trim();
+    const health = await response.json();
 
-    if (!question) {
-      output.textContent = "اكتب سؤالك أولاً.";
-      return;
-    }
-
-    analyzeButton.disabled = true;
-    status.textContent = "جارٍ التحليل...";
-
-    try {
-      const result = await request("/api/analyze", {
-        question
-      });
-
-      output.textContent =
-        result.answer ||
-        result.analysis ||
-        JSON.stringify(result, null, 2);
-
-      status.textContent = "اكتمل التحليل";
-    } catch (error) {
-      showError(error);
-    } finally {
-      analyzeButton.disabled = false;
-    }
-  });
+    connection.textContent = health.ai_configured
+      ? "متصل والذكاء الاصطناعي جاهز"
+      : "متصل، لكن يلزم إعداد الذكاء الاصطناعي";
+  } catch {
+    connection.textContent = "غير متصل";
+  }
 }
 
-// تنفيذ تجارب Python
-const runButton = $("runBtn");
+const runButton = $("run");
 
-if (runButton) {
-  runButton.addEventListener("click", async () => {
-    const code = $("code")?.value || "";
+runButton.addEventListener("click", async () => {
+  const question = $("question").value.trim();
 
-    if (!code.trim()) {
-      output.textContent = "أدخل كود Python أولاً.";
-      return;
-    }
+  if (!question) {
+    showError(new Error("اكتب الفرضية أولاً"));
+    return;
+  }
 
-    runButton.disabled = true;
-    status.textContent = "جارٍ التنفيذ...";
+  runButton.disabled = true;
+  connection.textContent = "جارٍ التحليل...";
 
-    try {
-      const result = await request("/api/experiment", {
-        code
-      });
+  try {
+    const result = await callApi("/api/analyze", {
+      message: question
+    });
 
-      output.textContent =
-        result.output ||
-        result.stdout ||
-        JSON.stringify(result, null, 2);
+    report.classList.remove("hidden");
+    report.textContent = result.reply || "لا توجد نتيجة";
+    connection.textContent = "اكتمل التحليل";
+  } catch (error) {
+    showError(error);
+  } finally {
+    runButton.disabled = false;
+  }
+});
 
-      status.textContent = "انتهى التنفيذ";
-    } catch (error) {
-      showError(error);
-    } finally {
-      runButton.disabled = false;
-    }
-  });
-}
+const executeButton = $("execute");
 
-// مسح النتائج
-const clearButton = $("clearBtn");
+executeButton.addEventListener("click", async () => {
+  const code = $("code").value.trim();
 
-if (clearButton) {
-  clearButton.addEventListener("click", () => {
-    output.textContent = "";
-    status.textContent = "جاهز";
-  });
-}
+  if (!code) {
+    showError(new Error("أدخل كود Python"));
+    return;
+  }
 
-// اختبار الاتصال
-const connectButton = $("connectBtn");
+  executeButton.disabled = true;
+  connection.textContent = "جارٍ التنفيذ...";
 
-if (connectButton) {
-  connectButton.addEventListener("click", async () => {
-    try {
-      const response = await fetch(apiBase() + "/health");
+  try {
+    const result = await callApi("/api/experiment", { code });
 
-      if (!response.ok) {
-        throw new Error("الخادم لا يستجيب");
-      }
+    report.classList.remove("hidden");
+    report.textContent =
+      (result.ok ? "نجح التنفيذ\n" : "فشل التنفيذ\n") +
+      (result.stdout || "") +
+      "\n" +
+      (result.stderr || "");
 
-      status.textContent = "متصل";
-    } catch (error) {
-      showError(error);
-    }
-  });
-}
+    connection.textContent = "انتهى التنفيذ";
+  } catch (error) {
+    showError(error);
+  } finally {
+    executeButton.disabled = false;
+  }
+});
+
+const clearButton = $("clear");
+
+clearButton.addEventListener("click", () => {
+  $("question").value = "";
+  $("code").value = "";
+  report.textContent = "";
+  report.classList.add("hidden");
+  connection.textContent = "جاهز";
+});
