@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#081321"><title>ARTHER Research Agent</title><link rel="stylesheet" href="style.css"></head>
+<body><main class="app">
+<header><div class="logo">A</div><div><b>ARTHER</b><small>RESEARCH & EXPERIMENT AGENT</small></div><span id="connection" class="pill">يفحص الاتصال…</span></header>
+<section class="intro"><div class="orb">A</div><p class="kicker">THINK · TEST · VERIFY</p><h1>مختبرك الذكي</h1><p>حوّل الفرضيات إلى تجارب قابلة للقياس، واختبرها بالأدلة لا بالتخمين.</p></section>
+<section id="report" class="report hidden"></section>
+<section class="workspace"><label for="question">الفكرة أو الفرضية</label><textarea id="question" rows="4" placeholder="اكتب الفرضية أو المسألة التي تريد اختبارها…"></textarea>
+<div class="actions"><button id="run" class="primary">حلّل واختبر الفرضية</button><button id="clear" class="secondary">مسح</button></div>
+<details><summary>تنفيذ تجربة Python يدوياً</summary><p class="warning">شغّل فقط كوداً تثق به. التنفيذ محلي وليس صندوقاً آمناً للكود غير الموثوق.</p><textarea id="code" rows="6" dir="ltr" placeholder="import random&#10;trials = 10000&#10;..."></textarea><button id="execute" class="secondary">تنفيذ الكود</button><pre id="output"></pre></details>
+</section><footer>ARTHER 2.0 · لا يدّعي اليقين المطلق · تحقّق من النتائج المهمة</footer></main><script src="app.js"></script></body></html>
