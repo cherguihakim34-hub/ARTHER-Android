@@ -12,22 +12,20 @@ let apiUrl = (
   DEFAULT_API_URL
 ).replace(/\/+$/, "");
 
-function getApiUrl() {
-  return apiUrl;
-}
-
 function showReport(message) {
   if (!report) return;
 
   report.classList.remove("hidden");
-  report.textContent = message;
+  report.textContent = String(message);
 }
 
 function showError(error) {
-  showReport("خطأ: " + (error?.message || String(error)));
+  const message = error?.message || String(error);
+
+  showReport("خطأ: " + message);
 
   if (connection) {
-    connection.textContent = "غير متصل";
+    connection.textContent = "حدث خطأ";
   }
 }
 
@@ -47,24 +45,38 @@ async function requestApi(path, data = null) {
   let response;
 
   try {
-    response = await fetch(getApiUrl() + path, options);
+    response = await fetch(apiUrl + path, options);
   } catch (error) {
-    throw new Error("تعذر الاتصال بالخادم. تحقق من الإنترنت.");
+    throw new Error(
+      "تعذر الاتصال بالخادم. تحقق من الإنترنت."
+    );
   }
 
   const result = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const detail =
+    throw new Error(
       result.detail ||
       result.message ||
       result.error ||
-      `HTTP ${response.status}`;
-
-    throw new Error(detail);
+      `HTTP ${response.status}`
+    );
   }
 
   return result;
+}
+
+function setBusy(button, busy, label) {
+  if (!button) return;
+
+  button.disabled = busy;
+
+  if (busy) {
+    button.dataset.originalText = button.textContent;
+    button.textContent = label;
+  } else if (button.dataset.originalText) {
+    button.textContent = button.dataset.originalText;
+  }
 }
 
 async function checkConnection() {
@@ -91,30 +103,17 @@ async function checkConnection() {
   }
 }
 
-function setBusy(button, busy, text) {
-  if (!button) return;
-
-  button.disabled = busy;
-
-  if (busy) {
-    button.dataset.originalText = button.textContent;
-    button.textContent = text;
-  } else if (button.dataset.originalText) {
-    button.textContent = button.dataset.originalText;
-  }
-}
-
 function formatAgentResult(result) {
   const sections = [];
 
-  sections.push(result.answer || "لم يرجع الخادم إجابة.");
+  sections.push(
+    result.answer || "لم يرجع الخادم إجابة."
+  );
 
-  if (result.plan) {
+  if (result.plan && Array.isArray(result.plan.steps)) {
     sections.push("\n\n--- خطة التنفيذ ---");
 
-    const steps = result.plan.steps || [];
-
-    for (const step of steps) {
+    for (const step of result.plan.steps) {
       sections.push(
         `${step.id}. ${step.description}`
       );
@@ -134,7 +133,7 @@ function formatAgentResult(result) {
 
   if (Array.isArray(result.tool_calls)) {
     sections.push(
-      "\n\nعدد عمليات الأدوات: " +
+      "\nعدد عمليات الأدوات: " +
       result.tool_calls.length
     );
   }
@@ -142,9 +141,9 @@ function formatAgentResult(result) {
   return sections.join("\n");
 }
 
-// ==========================================
-// ANALYZE
-// ==========================================
+// ==================================================
+// NORMAL ANALYSIS
+// ==================================================
 
 const runButton = $("run");
 
@@ -160,7 +159,7 @@ if (runButton) {
     setBusy(runButton, true, "جارٍ التحليل...");
 
     if (connection) {
-      connection.textContent = "ARTHER يعمل...";
+      connection.textContent = "ARTHER يحلل...";
     }
 
     try {
@@ -170,8 +169,7 @@ if (runButton) {
       });
 
       showReport(
-        result.answer ||
-        "لم يرجع الخادم إجابة."
+        result.answer || "لم يرجع الخادم إجابة."
       );
 
       if (connection) {
@@ -185,9 +183,9 @@ if (runButton) {
   });
 }
 
-// ==========================================
-// AGENT
-// ==========================================
+// ==================================================
+// FULL AGENT
+// ==================================================
 
 const agentButton = $("agent");
 
@@ -200,7 +198,11 @@ if (agentButton) {
       return;
     }
 
-    setBusy(agentButton, true, "جارٍ التفكير والتنفيذ...");
+    setBusy(
+      agentButton,
+      true,
+      "جارٍ التفكير والتنفيذ..."
+    );
 
     if (connection) {
       connection.textContent = "ARTHER ينفذ المهمة...";
@@ -226,9 +228,9 @@ if (agentButton) {
   });
 }
 
-// ==========================================
-// EXPERIMENT
-// ==========================================
+// ==================================================
+// PYTHON EXPERIMENT
+// ==================================================
 
 const executeButton = $("execute");
 
@@ -243,9 +245,9 @@ if (executeButton) {
   });
 }
 
-// ==========================================
+// ==================================================
 // CLEAR
-// ==========================================
+// ==================================================
 
 const clearButton = $("clear");
 
@@ -270,10 +272,8 @@ if (clearButton) {
   });
 }
 
-// ==========================================
+// ==================================================
 // START
-// ==========================================
+// ==================================================
 
-document.addEventListener("DOMContentLoaded", () => {
-  checkConnection();
-});
+checkConnection();
