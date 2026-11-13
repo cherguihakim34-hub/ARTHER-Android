@@ -1,15 +1,18 @@
 
 import os
-import httpx
+from uuid import uuid4
+from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from agent_core import run_agent
+from memory_store import init_memory, close_memory
 
 APP_NAME = "ARTHER"
-VERSION = "3.1.0"
+VERSION = "3.2.0"
 
 API_KEY = os.getenv("AI_API_KEY", "")
 BASE_URL = os.getenv(
@@ -18,10 +21,19 @@ BASE_URL = os.getenv(
 ).rstrip("/")
 MODEL = os.getenv("AI_MODEL", "openai/gpt-oss-120b")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.memory_ready = await init_memory()
+    yield
+    await close_memory()
+
+
 app = FastAPI(
     title="ARTHER AI",
     description="Autonomous Research and Technical Helper",
-    version=VERSION
+    version=VERSION,
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -41,6 +53,11 @@ class AnalyzeRequest(BaseModel):
 class AgentRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=12000)
     language: str = "auto"
+    session_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=80
+    )
 
 
 class ExperimentRequest(BaseModel):
@@ -91,7 +108,8 @@ async def health():
         "status": "online",
         "ai_configured": bool(API_KEY),
         "model": MODEL,
-        "agent_core": True
+        "agent_core": True,
+        "memory_enabled": app.state.memory_ready
     }
 
 
@@ -167,11 +185,16 @@ async def agent(request: AgentRequest):
             detail="AI_API_KEY is not configured on the server."
         )
 
+    session_id = request.session_id or str(uuid4())
+
     try:
         result = await run_agent(
             prompt=request.prompt,
-            language=request.language
+            language=request.language,
+            session_id=session_id
         )
+
+        result["memory_enabled"] = app.state.memory_ready
 
         return {
             "success": True,
