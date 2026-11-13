@@ -1,0 +1,238 @@
+
+import json
+import re
+
+
+def _json_object(raw):
+    if isinstance(raw, dict):
+        return raw
+
+    content = str(raw or "").strip()
+    content = re.sub(
+        r"^```(?:json)?\s*|\s*```$",
+        "",
+        content,
+        flags=re.IGNORECASE,
+    )
+
+    try:
+        result = json.loads(content)
+        return result if isinstance(result, dict) else {}
+    except Exception:
+        match = re.search(r"\{.*\}", content, re.DOTALL)
+        if match:
+            try:
+                result = json.loads(match.group(0))
+                return result if isinstance(result, dict) else {}
+            except Exception:
+                pass
+
+    return {}
+
+
+async def _ask(client, base_url, api_key, model, system, user):
+    response = await client.post(
+        f"{base_url.rstrip('/')}/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}"},
+        json={
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+        },
+    )
+
+    response.raise_for_status()
+    data = response.json()
+
+    return _json_object(
+        data["choices"][0]["message"].get("content", "")
+    )
+
+
+async def create_plan(
+    client, base_url, api_key, model, prompt, language="auto"
+):
+    system = """
+You are ARTHER's planning module.
+Return valid JSON only.
+Create a safe, practical plan with 1 to 7 steps.
+Never propose destructive actions, credential disclosure,
+arbitrary shell execution, or access to unconnected devices.
+
+Allowed tools:
+list_files, read_file, write_file,
+save_memory, search_memories, none
+
+JSON format:
+{
+  "objective": "main objective",
+  "steps": [
+    {
+      "id": 1,
+      "description": "step description",
+      "tools": ["none"]
+    }
+  ]
+}
+"""
+
+    try:
+        result = await _ask(
+            client,
+            base_url,
+            api_key,
+            model,
+            system,
+            json.dumps(
+                {"language": language, "task": prompt},
+                ensure_ascii=False,
+            ),
+        )
+
+        steps = result.get("steps")
+
+        if not isinstance(steps, list):
+            raise ValueError("Planner returned no steps")
+
+        allowed = {
+            "list_files",
+            "read_file",
+            "write_file",
+            "save_memory",
+            "search_memories",
+            "none",
+        }
+
+        clean_steps = []
+
+        for index, step in enumerate(steps[:7], 1):
+            if not isinstance(step, dict):
+                continue
+
+            tools = step.get("tools", [])
+
+            if not isinstance(tools, list):
+                tools = []
+
+            clean_steps.append({
+                "id": index,
+                "description": str(
+                    step.get("description", "Execute step")
+                )[:500],
+                "tools": [
+                    tool for tool in tools
+                    if tool in allowed
+                ],
+            })
+
+        if not clean_steps:
+            raise ValueError("Empty plan")
+
+        return {
+            "objective": str(
+                result.get("objective", prompt)
+            )[:500],
+            "steps": clean_steps,
+            "status": "planned",
+        }
+
+    except Exception as exc:
+        return {
+            "objective": prompt[:500],
+            "steps": [{
+                "id": 1,
+                "description": "Process the request using available tools",
+                "tools": ["none"],
+            }],
+            "status": "fallback",
+            "planner_error": str(exc)[:300],
+        }
+
+
+async def verify_execution(
+    client,
+    base_url,
+    api_key,
+    model,
+    prompt,
+    plan,
+    tool_log,
+    draft,
+):
+    system = """
+You are ARTHER's verification module.
+
+Evaluate only the supplied execution evidence.
+Do not claim certainty beyond the evidence.
+
+Return JSON only:
+{
+  "status": "completed",
+  "checks": ["check result"],
+  "note": "short explanation"
+}
+
+Allowed status values:
+completed, partial, blocked, unverified
+
+If no external action or tool execution was needed,
+use unverified instead of pretending it was verified.
+"""
+
+    evidence = {
+        "request": prompt,
+        "plan": plan,
+        "tool_results": tool_log,
+        "draft_answer": draft,
+    }
+
+    try:
+        result = await _ask(
+            client,
+            base_url,
+            api_key,
+            model,
+            system,
+            json.dumps(
+                evidence,
+                ensure_ascii=False,
+                default=str,
+            )[:12000],
+        )
+
+        status = result.get("status", "unverified")
+
+        if status not in {
+            "completed",
+            "partial",
+            "blocked",
+            "unverified",
+        }:
+            status = "unverified"
+
+        checks = result.get("checks", [])
+
+        if not isinstance(checks, list):
+            checks = []
+
+        return {
+            "status": status,
+            "checks": [
+                str(item)[:300] for item in checks[:8]
+            ],
+            "note": str(result.get("note", ""))[:700],
+        }
+
+    except Exception as exc:
+        return {
+            "status": "unverified",
+            "checks": [],
+            "note": (
+                "تعذّر تشغيل التحقق الآلي: "
+                + str(exc)[:250]
+            ),
+        }
