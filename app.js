@@ -1,124 +1,279 @@
+"use strict";
 
 const $ = (id) => document.getElementById(id);
 
 const report = $("report");
 const connection = $("connection");
 
-let apiUrl = localStorage.getItem("arther_api_base") || "";
+const DEFAULT_API_URL = "https://arther-api.onrender.com";
+
+let apiUrl = (
+  localStorage.getItem("arther_api_base") ||
+  DEFAULT_API_URL
+).replace(/\/+$/, "");
 
 function getApiUrl() {
-  if (!apiUrl) {
-    const entered = prompt("أدخل رابط خادم ARTHER:");
-    if (!entered) throw new Error("أدخل رابط الخادم أولاً");
-
-    apiUrl = entered.trim().replace(/\/$/, "");
-    localStorage.setItem("arther_api_base", apiUrl);
-  }
   return apiUrl;
 }
 
-async function callApi(path, data) {
-  const response = await fetch(getApiUrl() + path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data)
-  });
+function showReport(message) {
+  if (!report) return;
+
+  report.classList.remove("hidden");
+  report.textContent = message;
+}
+
+function showError(error) {
+  showReport("خطأ: " + (error?.message || String(error)));
+
+  if (connection) {
+    connection.textContent = "غير متصل";
+  }
+}
+
+async function requestApi(path, data = null) {
+  const options = {
+    method: data === null ? "GET" : "POST",
+    headers: {
+      "Accept": "application/json"
+    }
+  };
+
+  if (data !== null) {
+    options.headers["Content-Type"] = "application/json";
+    options.body = JSON.stringify(data);
+  }
+
+  let response;
+
+  try {
+    response = await fetch(getApiUrl() + path, options);
+  } catch (error) {
+    throw new Error("تعذر الاتصال بالخادم. تحقق من الإنترنت.");
+  }
 
   const result = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(result.detail || "خطأ في الاتصال بالخادم");
+    const detail =
+      result.detail ||
+      result.message ||
+      result.error ||
+      `HTTP ${response.status}`;
+
+    throw new Error(detail);
   }
 
   return result;
 }
 
-function showError(error) {
-  report.classList.remove("hidden");
-  report.textContent = "خطأ: " + error.message;
-  connection.textContent = "غير متصل";
-}
-
 async function checkConnection() {
+  if (connection) {
+    connection.textContent = "جارٍ الاتصال...";
+  }
+
   try {
-    const response = await fetch(getApiUrl() + "/health");
-    if (!response.ok) throw new Error();
+    const health = await requestApi("/health");
 
-    const health = await response.json();
+    if (connection) {
+      connection.textContent = health.ai_configured
+        ? "متصل - ARTHER جاهز"
+        : "متصل - مفتاح الذكاء الاصطناعي غير مضبوط";
+    }
 
-    connection.textContent = health.ai_configured
-      ? "متصل والذكاء الاصطناعي جاهز"
-      : "متصل، لكن يلزم إعداد الذكاء الاصطناعي";
-  } catch {
-    connection.textContent = "غير متصل";
+    return health;
+  } catch (error) {
+    if (connection) {
+      connection.textContent = "غير متصل بالخادم";
+    }
+
+    return null;
   }
 }
+
+function setBusy(button, busy, text) {
+  if (!button) return;
+
+  button.disabled = busy;
+
+  if (busy) {
+    button.dataset.originalText = button.textContent;
+    button.textContent = text;
+  } else if (button.dataset.originalText) {
+    button.textContent = button.dataset.originalText;
+  }
+}
+
+function formatAgentResult(result) {
+  const sections = [];
+
+  sections.push(result.answer || "لم يرجع الخادم إجابة.");
+
+  if (result.plan) {
+    sections.push("\n\n--- خطة التنفيذ ---");
+
+    const steps = result.plan.steps || [];
+
+    for (const step of steps) {
+      sections.push(
+        `${step.id}. ${step.description}`
+      );
+    }
+  }
+
+  if (result.verification) {
+    sections.push("\n\n--- التحقق ---");
+    sections.push(
+      "الحالة: " + result.verification.status
+    );
+
+    if (result.verification.note) {
+      sections.push(result.verification.note);
+    }
+  }
+
+  if (Array.isArray(result.tool_calls)) {
+    sections.push(
+      "\n\nعدد عمليات الأدوات: " +
+      result.tool_calls.length
+    );
+  }
+
+  return sections.join("\n");
+}
+
+// ==========================================
+// ANALYZE
+// ==========================================
 
 const runButton = $("run");
 
-runButton.addEventListener("click", async () => {
-  const question = $("question").value.trim();
+if (runButton) {
+  runButton.addEventListener("click", async () => {
+    const question = $("question")?.value.trim();
 
-  if (!question) {
-    showError(new Error("اكتب الفرضية أولاً"));
-    return;
-  }
+    if (!question) {
+      showError(new Error("اكتب سؤالك أولاً."));
+      return;
+    }
 
-  runButton.disabled = true;
-  connection.textContent = "جارٍ التحليل...";
+    setBusy(runButton, true, "جارٍ التحليل...");
 
-  try {
-    const result = await callApi("/api/analyze", {
-      message: question
-    });
+    if (connection) {
+      connection.textContent = "ARTHER يعمل...";
+    }
 
-    report.classList.remove("hidden");
-    report.textContent = result.reply || "لا توجد نتيجة";
-    connection.textContent = "اكتمل التحليل";
-  } catch (error) {
-    showError(error);
-  } finally {
-    runButton.disabled = false;
-  }
-});
+    try {
+      const result = await requestApi("/api/analyze", {
+        prompt: question,
+        language: "ar"
+      });
+
+      showReport(
+        result.answer ||
+        "لم يرجع الخادم إجابة."
+      );
+
+      if (connection) {
+        connection.textContent = "اكتمل التحليل";
+      }
+    } catch (error) {
+      showError(error);
+    } finally {
+      setBusy(runButton, false);
+    }
+  });
+}
+
+// ==========================================
+// AGENT
+// ==========================================
+
+const agentButton = $("agent");
+
+if (agentButton) {
+  agentButton.addEventListener("click", async () => {
+    const question = $("question")?.value.trim();
+
+    if (!question) {
+      showError(new Error("اكتب طلبك أولاً."));
+      return;
+    }
+
+    setBusy(agentButton, true, "جارٍ التفكير والتنفيذ...");
+
+    if (connection) {
+      connection.textContent = "ARTHER ينفذ المهمة...";
+    }
+
+    try {
+      const result = await requestApi("/api/agent", {
+        prompt: question,
+        language: "ar",
+        session_id: "arther-web-session"
+      });
+
+      showReport(formatAgentResult(result));
+
+      if (connection) {
+        connection.textContent = "انتهت المهمة";
+      }
+    } catch (error) {
+      showError(error);
+    } finally {
+      setBusy(agentButton, false);
+    }
+  });
+}
+
+// ==========================================
+// EXPERIMENT
+// ==========================================
 
 const executeButton = $("execute");
 
-executeButton.addEventListener("click", async () => {
-  const code = $("code").value.trim();
+if (executeButton) {
+  executeButton.addEventListener("click", () => {
+    showError(
+      new Error(
+        "تنفيذ Python غير متاح حالياً. " +
+        "الخادم يعطّل هذه الميزة لأسباب أمنية."
+      )
+    );
+  });
+}
 
-  if (!code) {
-    showError(new Error("أدخل كود Python"));
-    return;
-  }
-
-  executeButton.disabled = true;
-  connection.textContent = "جارٍ التنفيذ...";
-
-  try {
-    const result = await callApi("/api/experiment", { code });
-
-    report.classList.remove("hidden");
-    report.textContent =
-      (result.ok ? "نجح التنفيذ\n" : "فشل التنفيذ\n") +
-      (result.stdout || "") +
-      "\n" +
-      (result.stderr || "");
-
-    connection.textContent = "انتهى التنفيذ";
-  } catch (error) {
-    showError(error);
-  } finally {
-    executeButton.disabled = false;
-  }
-});
+// ==========================================
+// CLEAR
+// ==========================================
 
 const clearButton = $("clear");
 
-clearButton.addEventListener("click", () => {
-  $("question").value = "";
-  $("code").value = "";
-  report.textContent = "";
-  report.classList.add("hidden");
-  connection.textContent = "جاهز";
+if (clearButton) {
+  clearButton.addEventListener("click", () => {
+    if ($("question")) {
+      $("question").value = "";
+    }
+
+    if ($("code")) {
+      $("code").value = "";
+    }
+
+    if (report) {
+      report.textContent = "";
+      report.classList.add("hidden");
+    }
+
+    if (connection) {
+      connection.textContent = "جاهز";
+    }
+  });
+}
+
+// ==========================================
+// START
+// ==========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  checkConnection();
 });
