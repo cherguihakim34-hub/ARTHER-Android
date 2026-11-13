@@ -53,6 +53,13 @@ MAX_TOOL_ROUNDS = 7
 MAX_FILE_BYTES = 200_000
 MAX_REPO_ITEMS = 1000
 
+# Token / context limits
+MAX_HISTORY_MESSAGES = 4
+MAX_HISTORY_CHARS = 1200
+MAX_MEMORY_CHARS = 1200
+MAX_TOOL_RESULT_CHARS = 6000
+MAX_AGENT_COMPLETION_TOKENS = 1200
+
 WORKSPACE = Path(
     os.getenv("ARTHER_WORKSPACE", "/tmp/arther_workspace")
 ).resolve()
@@ -94,6 +101,106 @@ Arabic, French and English.
 Reply in the user's language.
 Be direct, accurate and practical.
 """
+
+
+# ============================================================
+# CONTEXT LIMIT HELPERS
+# ============================================================
+
+def limit_text(value, max_chars):
+    text = str(value or "")
+
+    if len(text) <= max_chars:
+        return text
+
+    return text[:max_chars] + "\n[Content truncated]"
+
+
+def compact_history(history):
+    """
+    Keep only a small number of recent messages.
+    """
+
+    if not isinstance(history, list):
+        return []
+
+    result = []
+
+    for item in history[-MAX_HISTORY_MESSAGES:]:
+        if not isinstance(item, dict):
+            continue
+
+        role = item.get("role")
+
+        if role not in {"user", "assistant"}:
+            continue
+
+        content = limit_text(
+            item.get("content", ""),
+            MAX_HISTORY_CHARS,
+        )
+
+        if not content:
+            continue
+
+        result.append({
+            "role": role,
+            "content": content,
+        })
+
+    return result
+
+
+def compact_tool_result(result):
+    """
+    Keep tool results valid JSON while limiting their size.
+    """
+
+    if not isinstance(result, dict):
+        result = {
+            "ok": False,
+            "result": str(result),
+        }
+
+    compact = dict(result)
+
+    # Large repository or workspace listings.
+    if isinstance(compact.get("items"), list):
+        compact["items"] = compact["items"][:60]
+
+        if len(result["items"]) > 60:
+            compact["truncated"] = True
+
+    # Large file contents.
+    if isinstance(compact.get("content"), str):
+        compact["content"] = limit_text(
+            compact["content"],
+            MAX_TOOL_RESULT_CHARS,
+        )
+
+    # Large memory results.
+    if isinstance(compact.get("memories"), list):
+        compact["memories"] = compact["memories"][:10]
+
+    encoded = json.dumps(
+        compact,
+        ensure_ascii=False,
+        default=str,
+    )
+
+    if len(encoded) <= MAX_TOOL_RESULT_CHARS:
+        return encoded
+
+    # Last-resort safe summary. Keep valid JSON.
+    return json.dumps(
+        {
+            "ok": compact.get("ok", False),
+            "truncated": True,
+            "message": "Tool result exceeded the context limit.",
+            "preview": encoded[:MAX_TOOL_RESULT_CHARS - 300],
+        },
+        ensure_ascii=False,
+    )
 
 
 # ============================================================
@@ -747,6 +854,8 @@ async def ask_agent(client, messages):
             "tools": TOOLS,
             "tool_choice": "auto",
             "temperature": 0.2,
+            "max_completion_tokens": MAX_AGENT_COMPLETION_TOKENS,
+            "reasoning_effort": "low",
         },
     )
 
@@ -786,10 +895,13 @@ async def run_agent(
     if not prompt:
         raise ValueError("Prompt cannot be empty.")
 
+    # Load a smaller history.
     history = await get_history(
         session_id,
-        limit=12
+        limit=MAX_HISTORY_MESSAGES,
     )
+
+    history = compact_history(history)
 
     tool_log = []
 
@@ -912,7 +1024,12 @@ async def run_agent(
     # --------------------------------------------------------
 
     memory_context = await get_memory_context(
-        limit=12
+        limit=4
+    )
+
+    memory_context = limit_text(
+        memory_context,
+        MAX_MEMORY_CHARS,
     )
 
     system = SYSTEM_PROMPT
@@ -952,13 +1069,19 @@ async def run_agent(
             language,
         )
 
+        plan_text = json.dumps(
+            plan,
+            ensure_ascii=False,
+            default=str,
+        )
+
         messages.append({
             "role": "system",
             "content": (
                 "EXECUTION PLAN. Follow it safely. "
                 "Use tools when necessary. "
                 "Never claim an operation succeeded without its result.\n"
-                + json.dumps(plan, ensure_ascii=False)
+                + limit_text(plan_text, 3000)
             ),
         })
 
@@ -1039,11 +1162,7 @@ async def run_agent(
                 messages.append({
                     "role": "tool",
                     "tool_call_id": call.get("id", ""),
-                    "content": json.dumps(
-                        result,
-                        ensure_ascii=False,
-                        default=str,
-                    ),
+                    "content": compact_tool_result(result),
                 })
 
     # --------------------------------------------------------
