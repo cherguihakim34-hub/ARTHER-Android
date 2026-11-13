@@ -1,326 +1,362 @@
 
 import json
 import re
-from typing import Any
-
 import httpx
 
 
-def _json_object(raw: str) -> dict:
-    """Extract a JSON object from the model response."""
-    raw = (raw or "").strip()
+def _json_object(raw):
+    if isinstance(raw, dict):
+        return raw
+
+    content = str(raw or "").strip()
+    content = re.sub(
+        r"^```(?:json)?\s*|\s*```$",
+        "",
+        content,
+        flags=re.IGNORECASE,
+    )
 
     try:
-        data = json.loads(raw)
-        if isinstance(data, dict):
-            return data
-    except json.JSONDecodeError:
+        result = json.loads(content)
+        if isinstance(result, dict):
+            return result
+    except Exception:
         pass
 
-    match = re.search(r"\{[\s\S]*\}", raw)
+    match = re.search(r"\{.*\}", content, re.DOTALL)
     if match:
         try:
-            data = json.loads(match.group(0))
-            if isinstance(data, dict):
-                return data
-        except json.JSONDecodeError:
+            result = json.loads(match.group(0))
+            if isinstance(result, dict):
+                return result
+        except Exception:
             pass
 
-    raise ValueError("The model did not return valid JSON.")
+    raise ValueError("The AI response did not contain valid JSON.")
 
 
-async def _ask(
-    prompt: str,
-    system_prompt: str,
-    api_key: str,
-    base_url: str,
-    model: str,
-) -> dict:
-    """Ask the AI model for JSON, retrying without JSON mode on HTTP 400."""
-
-    url = base_url.rstrip("/") + "/chat/completions"
+async def _ask(client, base_url, api_key, model, system, user):
+    url = f"{base_url.rstrip('/')}/chat/completions"
 
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt},
-    ]
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "temperature": 0.1,
+    }
 
-    async with httpx.AsyncClient(timeout=90) as client:
+    # المحاولة الأولى: طلب JSON mode
+    first_payload = {
+        **payload,
+        "response_format": {"type": "json_object"},
+    }
 
-        payload = {
-            "model": model,
-            "messages": messages,
-            "temperature": 0.2,
-        }
+    response = await client.post(
+        url,
+        headers=headers,
+        json=first_payload,
+    )
 
-        # First attempt: JSON mode
-        first_payload = {
-            **payload,
-            "response_format": {"type": "json_object"},
-        }
+    # إذا رفض المزود JSON mode، نعيد الطلب بدونه
+    if response.status_code == 400:
+        first_error = response.text[:1500]
 
         response = await client.post(
             url,
             headers=headers,
-            json=first_payload,
+            json=payload,
         )
 
-        # Retry without response_format if the provider rejects it.
-        if response.status_code == 400:
-            first_error = response.text
-
-            response = await client.post(
-                url,
-                headers=headers,
-                json=payload,
-            )
-
-            if response.status_code >= 400:
-                raise RuntimeError(
-                    "AI request failed.\n"
-                    f"JSON mode error: {first_error}\n"
-                    f"Retry error: {response.text}"
-                )
-
-        elif response.status_code >= 400:
+        if response.status_code >= 400:
             raise RuntimeError(
-                f"AI request failed ({response.status_code}): "
-                f"{response.text}"
+                "Groq rejected both planner requests. "
+                f"JSON-mode error: {first_error} | "
+                f"Retry error: {response.text[:1500]}"
             )
 
-        result = response.json()
-        content = (
-            result.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
+    elif response.status_code >= 400:
+        raise RuntimeError(
+            f"Groq HTTP {response.status_code}: "
+            f"{response.text[:1500]}"
         )
 
-        if isinstance(content, list):
-            content = "".join(
-                item.get("text", "")
-                for item in content
-                if isinstance(item, dict)
-            )
+    data = response.json()
+    choices = data.get("choices") or []
 
-        return _json_object(content)
+    if not choices:
+        raise ValueError("Groq returned no choices.")
+
+    message = choices[0].get("message") or {}
+    content = message.get("content")
+
+    if not content:
+        raise ValueError("Groq returned an empty planner response.")
+
+    return _json_object(content)
 
 
 async def create_plan(
-    goal: str,
-    api_key: str,
-    base_url: str,
-    model: str,
-    language: str = "ar",
-) -> dict:
-    """Create an execution plan for the user's goal."""
+    client,
+    base_url,
+    api_key,
+    model,
+    prompt,
+    language="auto",
+):
+    system = """
+You are ARTHER, an advanced AI planning engine.
 
-    system_prompt = """
-You are ARTHER's planning engine.
+Analyze the user's complete objective and create a practical plan.
+Use 1 to 7 steps.
+Never claim that a step has already been executed.
+Never invent tools.
+Never propose destructive actions without approval.
+Never propose arbitrary shell execution.
 
-Analyze the user's goal and create a practical execution plan.
+Available tools:
+- list_files
+- read_file
+- write_file
+- save_memory
+- search_memories
+- none
 
-Return ONLY a valid JSON object with this structure:
-
+Return a valid JSON object only, with this structure:
 {
-  "status": "planned",
-  "goal": "goal description",
-  "summary": "short summary",
+  "objective": "Main objective",
+  "reasoning_summary": "Short approach",
   "steps": [
     {
       "id": 1,
-      "description": "step description",
-      "tool": "tool name or null",
-      "status": "pending"
+      "description": "Step description",
+      "tools": ["list_files"],
+      "expected_result": "Expected result"
     }
   ]
 }
-
-Rules:
-- Break the goal into clear, ordered steps.
-- Use only tools that are actually available.
-- Never claim a step was executed during planning.
-- Do not invent execution results.
-- Keep the user's requested language.
 """
 
-    prompt = (
-        f"Language: {language}\n"
-        f"User goal: {goal}\n"
-        "Create the execution plan."
-    )
+    request = {
+        "language": language,
+        "task": prompt,
+    }
 
     try:
-        plan = await _ask(
-            prompt,
-            system_prompt,
-            api_key,
+        result = await _ask(
+            client,
             base_url,
+            api_key,
             model,
+            system,
+            json.dumps(request, ensure_ascii=False),
         )
 
-        if not isinstance(plan.get("steps"), list):
+        steps = result.get("steps")
+        if not isinstance(steps, list) or not steps:
             raise ValueError("Planner returned no valid steps.")
 
-        plan["status"] = "planned"
-        plan["goal"] = plan.get("goal") or goal
+        allowed_tools = {
+            "list_files",
+            "read_file",
+            "write_file",
+            "save_memory",
+            "search_memories",
+            "none",
+        }
 
-        return plan
+        clean_steps = []
+
+        for index, step in enumerate(steps[:7], 1):
+            if not isinstance(step, dict):
+                continue
+
+            tools = step.get("tools", [])
+            if not isinstance(tools, list):
+                tools = []
+
+            clean_tools = [
+                tool for tool in tools
+                if isinstance(tool, str) and tool in allowed_tools
+            ]
+
+            clean_steps.append({
+                "id": index,
+                "description": str(
+                    step.get("description", "Execute task step")
+                )[:500],
+                "tools": clean_tools,
+                "expected_result": str(
+                    step.get("expected_result", "")
+                )[:500],
+            })
+
+        if not clean_steps:
+            raise ValueError("Planner produced no usable steps.")
+
+        return {
+            "objective": str(result.get("objective", prompt))[:1000],
+            "reasoning_summary": str(
+                result.get("reasoning_summary", "")
+            )[:1000],
+            "steps": clean_steps,
+            "status": "planned",
+        }
 
     except Exception as exc:
         return {
+            "objective": prompt[:1000],
+            "reasoning_summary": (
+                "Planning failed. A safe fallback was generated."
+            ),
+            "steps": [{
+                "id": 1,
+                "description": (
+                    "Handle the request using available agent capabilities."
+                ),
+                "tools": ["none"],
+                "expected_result": "Respond safely to the user.",
+            }],
             "status": "fallback",
-            "goal": goal,
-            "summary": "A basic fallback plan was created.",
-            "planner_error": str(exc),
-            "steps": [
-                {
-                    "id": 1,
-                    "description": "Analyze the requested task.",
-                    "tool": None,
-                    "status": "pending",
-                },
-                {
-                    "id": 2,
-                    "description": "Execute the available actions.",
-                    "tool": None,
-                    "status": "pending",
-                },
-                {
-                    "id": 3,
-                    "description": "Verify the results.",
-                    "tool": None,
-                    "status": "pending",
-                },
-            ],
+            "planner_error": str(exc)[:2000],
         }
 
 
 async def verify_execution(
-    plan: dict,
-    tool_results: list,
-    api_key: str,
-    base_url: str,
-    model: str,
-    language: str = "ar",
-) -> dict:
-    """Verify execution results without allowing false completion."""
-
-    successful_results = [
-        result
-        for result in tool_results
-        if isinstance(result, dict) and result.get("ok") is True
-    ]
-
-    # A fallback plan cannot be marked completed.
+    client,
+    base_url,
+    api_key,
+    model,
+    prompt,
+    plan,
+    tool_log,
+    draft,
+):
+    # لا نسمح لخطة احتياطية بأن تحصل على حالة completed
     if plan.get("status") == "fallback":
+        successful_tools = [
+            item for item in tool_log
+            if isinstance(item, dict)
+            and isinstance(item.get("result"), dict)
+            and item["result"].get("ok") is True
+        ]
+
+        failed_tools = [
+            item for item in tool_log
+            if isinstance(item, dict)
+            and isinstance(item.get("result"), dict)
+            and item["result"].get("ok") is False
+        ]
+
+        status = "partial" if successful_tools else "blocked"
+
         return {
-            "status": "partial" if successful_results else "blocked",
-            "verified": False,
-            "summary": (
-                "Some actions succeeded, but planning failed."
-                if successful_results
-                else "Planning failed; execution is not verified."
+            "status": status,
+            "checks": [
+                "The planning engine failed; fallback was used.",
+                f"Successful tool calls: {len(successful_tools)}.",
+                f"Failed tool calls: {len(failed_tools)}.",
+            ],
+            "completed_steps": [],
+            "failed_steps": ["Planning"],
+            "note": (
+                "Execution cannot be declared fully completed "
+                "because the planning engine did not produce a valid plan."
             ),
-            "reason": plan.get("planner_error", "Planner fallback"),
         }
 
-    system_prompt = """
+    system = """
 You are ARTHER's execution verification engine.
 
-Evaluate the plan and actual tool results.
+Verify only facts supported by tool results.
+Never invent successful operations.
+A generated answer is not proof of an external action.
+If no tool was required, use unverified.
+If execution is incomplete, use partial or blocked.
 
-Return ONLY valid JSON:
-
+Return JSON only:
 {
-  "status": "completed or partial or blocked",
-  "verified": true,
-  "summary": "verification summary",
+  "status": "completed",
+  "checks": [],
   "completed_steps": [],
   "failed_steps": [],
-  "remaining_steps": []
+  "note": "Verification summary"
 }
 
-Rules:
-- Never claim an action succeeded without evidence.
-- An empty tool result is not proof of success.
-- If only some steps succeeded, return partial.
-- If nothing was executed successfully, return blocked.
-- Return completed only when the available evidence confirms
-  that the requested task was completed.
-- Use the requested language.
+Allowed statuses: completed, partial, blocked, unverified.
 """
 
-    prompt = json.dumps(
-        {
-            "language": language,
-            "plan": plan,
-            "tool_results": tool_results,
-        },
-        ensure_ascii=False,
-        default=str,
-    )
+    evidence = {
+        "user_request": prompt,
+        "execution_plan": plan,
+        "tool_results": tool_log,
+        "agent_answer": draft,
+    }
 
     try:
-        verification = await _ask(
-            prompt,
-            system_prompt,
-            api_key,
+        result = await _ask(
+            client,
             base_url,
+            api_key,
             model,
+            system,
+            json.dumps(
+                evidence,
+                ensure_ascii=False,
+                default=str,
+            )[:12000],
         )
 
-        status = verification.get("status")
+        status = result.get("status", "unverified")
+        allowed = {"completed", "partial", "blocked", "unverified"}
 
-        if status not in ("completed", "partial", "blocked"):
-            status = "partial" if successful_results else "blocked"
+        if status not in allowed:
+            status = "unverified"
 
-        # Deterministic protection against unsupported completion.
-        if status == "completed" and not successful_results:
-            status = "blocked"
+        checks = result.get("checks", [])
+        completed = result.get("completed_steps", [])
+        failed = result.get("failed_steps", [])
 
-        verification["status"] = status
-        verification["verified"] = status == "completed"
+        if not isinstance(checks, list):
+            checks = []
+        if not isinstance(completed, list):
+            completed = []
+        if not isinstance(failed, list):
+            failed = []
 
-        return verification
+        return {
+            "status": status,
+            "checks": [str(x)[:500] for x in checks[:10]],
+            "completed_steps": completed[:10],
+            "failed_steps": failed[:10],
+            "note": str(result.get("note", ""))[:1000],
+        }
 
     except Exception as exc:
         return {
-            "status": "partial" if successful_results else "blocked",
-            "verified": False,
-            "summary": "Automatic verification could not be completed.",
-            "verification_error": str(exc),
+            "status": "unverified",
+            "checks": [],
+            "completed_steps": [],
+            "failed_steps": [],
+            "note": f"Automatic verification failed: {str(exc)[:1000]}",
         }
 
 
-def format_plan(plan: dict) -> str:
-    """Format a plan as readable text."""
+def format_plan(plan):
+    if not isinstance(plan, dict):
+        return "No execution plan available."
 
-    lines = [
-        f"Goal: {plan.get('goal', '')}",
-        f"Status: {plan.get('status', 'unknown')}",
-        f"Summary: {plan.get('summary', '')}",
-        "",
-        "Steps:",
-    ]
+    lines = [f"Objective: {plan.get('objective', '')}"]
 
     for step in plan.get("steps", []):
         lines.append(
-            f"{step.get('id', '?')}. "
-            f"{step.get('description', '')} "
-            f"[{step.get('status', 'pending')}]"
-        )
-
-    if plan.get("planner_error"):
-        lines.extend(
-            [
-                "",
-                f"Planner error: {plan['planner_error']}",
-            ]
+            f"{step.get('id', '?')}. {step.get('description', '')}"
         )
 
     return "\n".join(lines)
