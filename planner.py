@@ -103,14 +103,11 @@ async def _ask(
 
     first_error = None
 
-    # --------------------------------------------------------
-    # ATTEMPT 2: WITHOUT JSON MODE
-    # --------------------------------------------------------
-
     if response.status_code == 400:
 
         first_error = response.text[:1500]
 
+        # Retry without JSON mode.
         response = await client.post(
             url,
             headers=headers,
@@ -126,7 +123,6 @@ async def _ask(
         )
 
     data = response.json()
-
     choices = data.get("choices") or []
 
     if not choices:
@@ -143,7 +139,7 @@ async def _ask(
     content = message.get("content")
 
     # --------------------------------------------------------
-    # ATTEMPT 3: RETRY IF CONTENT IS EMPTY
+    # ATTEMPT 3: RETRY EMPTY RESPONSE
     # --------------------------------------------------------
 
     if not content:
@@ -204,10 +200,6 @@ async def _ask(
                 f"usage={usage}"
             )
 
-    # --------------------------------------------------------
-    # HANDLE CONTENT FORMAT
-    # --------------------------------------------------------
-
     if isinstance(content, list):
 
         content = "".join(
@@ -238,41 +230,28 @@ async def create_plan(
     language="auto",
 ):
     system = """
-You are ARTHER, an advanced AI planning engine.
+You are ARTHER's planning engine.
 
-Your task is to understand the user's complete objective
-and create a practical, logical execution plan.
+IMPORTANT:
+You are a TEXT-ONLY PLANNER.
 
-Use between 1 and 7 steps.
+You do not have access to tools.
+You must NEVER call, request, or simulate a function.
+You must NEVER produce tool calls.
+You must NEVER execute actions.
 
-Available tools:
+Your ONLY task is to create a written execution plan.
 
-- list_files
-- read_file
-- write_file
-- save_memory
-- search_memories
-- none
+Analyze the user's objective and divide it into
+1 to 7 clear, practical, ordered steps.
 
-IMPORTANT RULES:
-
-1. Analyze the complete user request.
-2. Divide the objective into clear steps.
-3. Select only available tools.
-4. Never invent tools.
-5. Never claim that a step has already been executed.
-6. Never invent execution results.
-7. Never propose arbitrary shell execution.
-8. Never perform destructive actions without approval.
-9. Keep the requested language.
-
-Return ONLY a valid JSON object.
+Return ONLY a JSON object as plain text.
 
 Required structure:
 
 {
     "objective": "Main objective",
-    "reasoning_summary": "Short approach",
+    "reasoning_summary": "Short planning approach",
     "steps": [
         {
             "id": 1,
@@ -282,6 +261,31 @@ Required structure:
         }
     ]
 }
+
+The tools field is only a text label describing which
+existing ARTHER capability may be needed later.
+
+It is NOT an instruction to call that capability.
+
+Available capability labels:
+
+- list_files
+- read_file
+- write_file
+- save_memory
+- search_memories
+- none
+
+RULES:
+
+1. Never invent tools.
+2. Never claim that a step was executed.
+3. Never invent execution results.
+4. Never propose arbitrary shell commands.
+5. Never propose destructive actions without approval.
+6. Never generate function calls.
+7. Return valid JSON only.
+8. Use the language requested by the user.
 """
 
     request = {
@@ -519,7 +523,7 @@ async def verify_execution(
     system = """
 You are ARTHER's execution verification engine.
 
-Your job is to verify execution using actual evidence.
+Verify only facts supported by tool results.
 
 RULES:
 
@@ -606,7 +610,7 @@ Allowed statuses:
         if not isinstance(failed, list):
             failed = []
 
-        # No successful tool evidence means no verified completion.
+        # Protect against unsupported completion.
         if status == "completed" and not successful_tools:
             status = "unverified"
 
