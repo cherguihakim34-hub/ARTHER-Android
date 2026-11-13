@@ -15,17 +15,25 @@ APP_NAME = "ARTHER"
 VERSION = "3.2.0"
 
 API_KEY = os.getenv("AI_API_KEY", "")
+
 BASE_URL = os.getenv(
     "AI_BASE_URL",
     "https://api.groq.com/openai/v1"
 ).rstrip("/")
-MODEL = os.getenv("AI_MODEL", "openai/gpt-oss-120b")
+
+MODEL = os.getenv(
+    "AI_MODEL",
+    "openai/gpt-oss-120b"
+)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+
     app.state.memory_ready = await init_memory()
+
     yield
+
     await close_memory()
 
 
@@ -46,13 +54,24 @@ app.add_middleware(
 
 
 class AnalyzeRequest(BaseModel):
-    prompt: str = Field(min_length=1, max_length=12000)
+
+    prompt: str = Field(
+        min_length=1,
+        max_length=12000
+    )
+
     language: str = "auto"
 
 
 class AgentRequest(BaseModel):
-    prompt: str = Field(min_length=1, max_length=12000)
+
+    prompt: str = Field(
+        min_length=1,
+        max_length=12000
+    )
+
     language: str = "auto"
+
     session_id: str | None = Field(
         default=None,
         min_length=1,
@@ -61,7 +80,11 @@ class AgentRequest(BaseModel):
 
 
 class ExperimentRequest(BaseModel):
-    code: str = Field(min_length=1, max_length=5000)
+
+    code: str = Field(
+        min_length=1,
+        max_length=5000
+    )
 
 
 SYSTEM_PROMPT = """
@@ -73,19 +96,16 @@ Your mission:
 - Explain technical subjects accurately.
 - Help with programming, engineering and research.
 - Identify errors and propose corrections.
-- Never claim that you executed an action unless a tool
-  actually performed it and returned a result.
+- Never claim execution unless a tool confirms it.
 
 Languages:
 Arabic, French and English.
-Reply in the user's language.
 
 Behavior:
 - Be direct, precise and practical.
 - Break complex tasks into clear steps.
 - State uncertainty honestly.
 - Never invent test results, files, access or capabilities.
-- Ask only for information essential to proceed.
 
 You are connected to the ARTHER application backend.
 """
@@ -93,6 +113,7 @@ You are connected to the ARTHER application backend.
 
 @app.get("/")
 async def home():
+
     return {
         "name": APP_NAME,
         "version": VERSION,
@@ -102,6 +123,7 @@ async def home():
 
 @app.get("/health")
 async def health():
+
     return {
         "name": APP_NAME,
         "version": VERSION,
@@ -115,14 +137,19 @@ async def health():
 
 @app.post("/api/analyze")
 async def analyze(request: AnalyzeRequest):
+
     if not API_KEY:
+
         raise HTTPException(
             status_code=503,
             detail="AI_API_KEY is not configured on the server."
         )
 
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT
+        },
         {
             "role": "user",
             "content": (
@@ -133,7 +160,9 @@ async def analyze(request: AnalyzeRequest):
     ]
 
     try:
+
         async with httpx.AsyncClient(timeout=90.0) as client:
+
             response = await client.post(
                 f"{BASE_URL}/chat/completions",
                 headers={
@@ -148,12 +177,14 @@ async def analyze(request: AnalyzeRequest):
             )
 
         if response.status_code >= 400:
+
             raise HTTPException(
                 status_code=502,
                 detail="AI provider error: " + response.text[:1000]
             )
 
         data = response.json()
+
         answer = data["choices"][0]["message"]["content"]
 
         return {
@@ -165,12 +196,16 @@ async def analyze(request: AnalyzeRequest):
 
     except HTTPException:
         raise
+
     except httpx.TimeoutException:
+
         raise HTTPException(
             status_code=504,
             detail="AI provider timed out."
         )
+
     except Exception as error:
+
         raise HTTPException(
             status_code=500,
             detail=f"Analysis failed: {str(error)}"
@@ -179,7 +214,9 @@ async def analyze(request: AnalyzeRequest):
 
 @app.post("/api/agent")
 async def agent(request: AgentRequest):
+
     if not API_KEY:
+
         raise HTTPException(
             status_code=503,
             detail="AI_API_KEY is not configured on the server."
@@ -188,6 +225,7 @@ async def agent(request: AgentRequest):
     session_id = request.session_id or str(uuid4())
 
     try:
+
         result = await run_agent(
             prompt=request.prompt,
             language=request.language,
@@ -204,12 +242,14 @@ async def agent(request: AgentRequest):
         }
 
     except httpx.TimeoutException:
+
         raise HTTPException(
             status_code=504,
             detail="The agent or AI provider timed out."
         )
 
     except RuntimeError as error:
+
         raise HTTPException(
             status_code=502,
             detail=str(error)
@@ -219,6 +259,7 @@ async def agent(request: AgentRequest):
         raise
 
     except Exception as error:
+
         raise HTTPException(
             status_code=500,
             detail=f"Agent execution failed: {str(error)}"
@@ -227,10 +268,12 @@ async def agent(request: AgentRequest):
 
 @app.post("/api/experiment")
 async def experiment(request: ExperimentRequest):
+
     if os.getenv(
         "ALLOW_REMOTE_EXECUTION",
         "false"
     ).lower() != "true":
+
         raise HTTPException(
             status_code=403,
             detail=(
@@ -241,5 +284,8 @@ async def experiment(request: ExperimentRequest):
 
     raise HTTPException(
         status_code=501,
-        detail="A secure isolated execution sandbox is not installed yet."
+        detail=(
+            "A secure isolated execution sandbox "
+            "is not installed yet."
+        )
     )
