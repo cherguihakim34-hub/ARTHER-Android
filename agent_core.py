@@ -1,7 +1,8 @@
 
-import json
 import os
+import json
 import re
+import base64
 from pathlib import Path
 
 import httpx
@@ -31,10 +32,7 @@ MODEL = os.getenv(
     "openai/gpt-oss-120b"
 )
 
-API_KEY = os.getenv(
-    "AI_API_KEY",
-    ""
-)
+API_KEY = os.getenv("AI_API_KEY", "")
 
 MAX_TOOL_ROUNDS = 7
 MAX_FILE_BYTES = 200_000
@@ -46,10 +44,19 @@ WORKSPACE = Path(
     )
 ).resolve()
 
-WORKSPACE.mkdir(
-    parents=True,
-    exist_ok=True
-)
+WORKSPACE.mkdir(parents=True, exist_ok=True)
+
+GITHUB_REPOSITORY = os.getenv(
+    "GITHUB_REPOSITORY",
+    "cherguihakim34-hub/ARTHER-Android"
+).strip()
+
+GITHUB_BRANCH = os.getenv(
+    "GITHUB_BRANCH",
+    "main"
+).strip()
+
+GITHUB_API = "https://api.github.com"
 
 
 # ============================================================
@@ -59,46 +66,39 @@ WORKSPACE.mkdir(
 SYSTEM_PROMPT = """
 You are ARTHER, an advanced multilingual AI assistant.
 
-Your capabilities include:
-- Understanding complex requests.
-- Planning tasks.
-- Using available tools.
-- Executing multi-step operations.
-- Analyzing tool results.
-- Checking execution results.
-- Maintaining long-term memory.
-- Explaining errors honestly.
+Your capabilities:
+- Understand complex requests.
+- Plan tasks.
+- Use available tools.
+- Execute multi-step operations.
+- Analyze results.
+- Verify actions.
+- Maintain long-term memory.
+- Read the configured GitHub repository.
 
-OPERATING RULES:
+RULES:
 
-1. Understand the user's complete objective.
-2. Follow the execution plan when appropriate.
-3. Use available tools when necessary.
-4. Analyze tool results before continuing.
-5. Never invent successful operations.
-6. Never claim that an action was completed unless evidence supports it.
-7. Ask before destructive actions.
-8. Work only inside the ARTHER workspace for file operations.
-9. Never execute arbitrary shell commands.
-10. Never expose API keys or credentials.
+1. Never invent execution results.
+2. Never claim an action succeeded without evidence.
+3. Ask before destructive actions.
+4. Never execute arbitrary shell commands.
+5. Never expose API keys or credentials.
+6. Local files are restricted to the ARTHER workspace.
+7. GitHub access is read-only.
+8. GitHub tools access only the configured repository.
+9. Distinguish workspace files from repository files.
+10. Never claim to have modified GitHub files.
 
-LONG-TERM MEMORY:
-
-- Persistent memory is stored in PostgreSQL.
-- Use save_memory for facts the user asks you to remember.
-- Use search_memories to retrieve previously saved information.
-- Never use write_file as a replacement for persistent memory.
-- Never claim memory was saved unless PostgreSQL confirms success.
-- Never save passwords, API keys, or sensitive secrets.
+MEMORY:
+- Use save_memory for requested facts.
+- Use search_memories for saved information.
+- Never claim a memory was saved without confirmation.
 
 LANGUAGES:
+Arabic, French and English.
 
-Support Arabic, French, and English.
-Reply in the language requested by the user.
-If no language is specified, follow the user's language.
-
-You are ARTHER.
-Be accurate, practical, analytical, and honest.
+Reply in the user's language.
+Be direct, accurate and practical.
 """
 
 
@@ -111,8 +111,7 @@ def is_memory_save_request(prompt):
     patterns = [
         r"\bremember\b",
         r"\bmemorize\b",
-        r"\bsave\s+(?:this|that|it|the following)\s+(?:in\s+)?(?:your\s+)?memory\b",
-        r"\bstore\s+(?:this|that|it)\s+in\s+memory\b",
+        r"\bsave\s+(?:this|that|it)\s+in\s+(?:your\s+)?memory\b",
         r"تذكر",
         r"تذكّر",
         r"احفظ",
@@ -122,15 +121,10 @@ def is_memory_save_request(prompt):
         r"souviens-toi",
         r"mémorise",
         r"memorise",
-        r"enregistre dans ta mémoire",
     ]
 
     return any(
-        re.search(
-            pattern,
-            prompt,
-            re.IGNORECASE
-        )
+        re.search(pattern, prompt, re.IGNORECASE)
         for pattern in patterns
     )
 
@@ -139,30 +133,21 @@ def is_memory_search_request(prompt):
 
     patterns = [
         r"\bwhat do you remember\b",
-        r"\bsearch (?:your )?(?:long.term )?memory\b",
-        r"\blook in (?:your )?memory\b",
+        r"\bsearch (?:your )?memory\b",
         r"\brecall\b",
         r"ماذا تتذكر",
         r"ما الذي تتذكره",
         r"ما الذي حفظته",
         r"ابحث في ذاكرتك",
-        r"في الذاكرة الدائمة",
-        r"استرجع من ذاكرتك",
         r"هل تتذكر",
         r"ما اسم مشروعي",
         r"ما هي المعلومات المحفوظة",
-        r"qu'est-ce que tu te rappelles",
-        r"que mémorises-tu",
         r"cherche dans ta mémoire",
         r"rappelle-toi",
     ]
 
     return any(
-        re.search(
-            pattern,
-            prompt,
-            re.IGNORECASE
-        )
+        re.search(pattern, prompt, re.IGNORECASE)
         for pattern in patterns
     )
 
@@ -172,20 +157,7 @@ def extract_memory_content(prompt):
     content = prompt.strip()
 
     if ":" in content:
-        content = content.split(
-            ":",
-            1
-        )[1].strip()
-
-    content = re.split(
-        r"\s*(?:استعمل أداة|ولا تكتف|لا تكتف|"
-        r"use the save_memory|do not just|"
-        r"please use|utilise l'outil|"
-        r"ne te contente pas)\b",
-        content,
-        maxsplit=1,
-        flags=re.IGNORECASE,
-    )[0].strip()
+        content = content.split(":", 1)[1].strip()
 
     content = re.sub(
         r"^(?:من فضلك\s*)?(?:تذكر|تذكّر|احفظ|خزن|"
@@ -200,13 +172,13 @@ def extract_memory_content(prompt):
 
 
 # ============================================================
-# FILE SECURITY
+# LOCAL WORKSPACE SECURITY
 # ============================================================
 
 def safe_path(relative_path):
 
     candidate = (
-        WORKSPACE / relative_path
+        WORKSPACE / str(relative_path)
     ).resolve()
 
     if (
@@ -220,45 +192,38 @@ def safe_path(relative_path):
     return candidate
 
 
-# ============================================================
-# FILE TOOLS
-# ============================================================
-
 def list_files(path="."):
 
     target = safe_path(path)
 
     if not target.exists() or not target.is_dir():
-
         return {
             "ok": False,
             "error": "Directory not found"
         }
 
+    items = []
+
+    for item in sorted(target.iterdir())[:200]:
+
+        items.append({
+            "name": item.name,
+            "type": (
+                "directory"
+                if item.is_dir()
+                else "file"
+            ),
+            "size": (
+                item.stat().st_size
+                if item.is_file()
+                else None
+            ),
+        })
+
     return {
         "ok": True,
-
-        "items": [
-            {
-                "name": item.name,
-
-                "type": (
-                    "directory"
-                    if item.is_dir()
-                    else "file"
-                ),
-
-                "size": (
-                    item.stat().st_size
-                    if item.is_file()
-                    else None
-                ),
-            }
-
-            for item in sorted(
-                target.iterdir()
-            )[:200]
-        ],
+        "workspace": str(WORKSPACE),
+        "items": items,
     }
 
 
@@ -267,29 +232,25 @@ def read_file(path):
     target = safe_path(path)
 
     if not target.is_file():
-
         return {
             "ok": False,
             "error": "File not found"
         }
 
     if target.stat().st_size > MAX_FILE_BYTES:
-
         return {
             "ok": False,
             "error": "File too large"
         }
 
     try:
-
         return {
             "ok": True,
-            "path": path,
+            "path": str(path),
             "content": target.read_text("utf-8"),
         }
 
     except UnicodeDecodeError:
-
         return {
             "ok": False,
             "error": "Not a UTF-8 text file"
@@ -300,13 +261,22 @@ def write_file(path, content):
 
     target = safe_path(path)
 
-    data = content.encode("utf-8")
+    data = str(content).encode("utf-8")
 
     if len(data) > MAX_FILE_BYTES:
-
         return {
             "ok": False,
             "error": "Content exceeds 200 KB"
+        }
+
+    # Do not silently overwrite existing files.
+    if target.exists():
+        return {
+            "ok": False,
+            "error": (
+                "File already exists. "
+                "Overwriting is not allowed by this tool."
+            )
         }
 
     target.parent.mkdir(
@@ -318,183 +288,334 @@ def write_file(path, content):
 
     return {
         "ok": True,
-        "path": str(
-            target.relative_to(WORKSPACE)
-        ),
+        "path": str(target.relative_to(WORKSPACE)),
         "bytes_written": len(data),
     }
 
 
 # ============================================================
-# AI TOOLS
+# GITHUB REPOSITORY SECURITY
 # ============================================================
+
+def safe_repo_path(path=""):
+
+    value = str(path or "").strip().replace("\\", "/")
+
+    if value.startswith("/") or "\x00" in value:
+        raise ValueError("Invalid repository path.")
+
+    parts = [
+        part
+        for part in value.split("/")
+        if part
+    ]
+
+    if any(part in {".", ".."} for part in parts):
+        raise ValueError("Invalid repository path.")
+
+    return "/".join(parts)
+
+
+async def github_request(path=""):
+
+    if (
+        not GITHUB_REPOSITORY
+        or GITHUB_REPOSITORY.count("/") != 1
+    ):
+        return {
+            "ok": False,
+            "error": "Invalid GITHUB_REPOSITORY setting."
+        }
+
+    safe_path = safe_repo_path(path)
+
+    url = (
+        f"{GITHUB_API}/repos/"
+        f"{GITHUB_REPOSITORY}/contents/"
+        f"{safe_path}"
+    )
+
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "ARTHER-Assistant",
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+
+        response = await client.get(
+            url,
+            headers=headers,
+            params={
+                "ref": GITHUB_BRANCH
+            },
+        )
+
+    if response.status_code == 404:
+        return {
+            "ok": False,
+            "error": "Repository path not found."
+        }
+
+    if response.status_code == 403:
+        return {
+            "ok": False,
+            "error": (
+                "GitHub rate limit or access restriction."
+            )
+        }
+
+    if response.status_code >= 400:
+        return {
+            "ok": False,
+            "error": (
+                f"GitHub API error {response.status_code}: "
+                f"{response.text[:500]}"
+            )
+        }
+
+    return {
+        "ok": True,
+        "data": response.json(),
+    }
+
+
+# ============================================================
+# GITHUB DIRECTORY LISTING
+# ============================================================
+
+async def list_repo_files(path=""):
+
+    try:
+
+        safe_path = safe_repo_path(path)
+
+        result = await github_request(safe_path)
+
+        if not result.get("ok"):
+            return result
+
+        data = result["data"]
+
+        if not isinstance(data, list):
+            return {
+                "ok": False,
+                "error": (
+                    "The requested path is a file, not a directory."
+                )
+            }
+
+        items = []
+
+        for item in data[:500]:
+
+            items.append({
+                "name": item.get("name"),
+                "path": item.get("path"),
+                "type": item.get("type"),
+                "size": item.get("size"),
+            })
+
+        return {
+            "ok": True,
+            "repository": GITHUB_REPOSITORY,
+            "branch": GITHUB_BRANCH,
+            "path": safe_path or ".",
+            "count": len(items),
+            "items": items,
+        }
+
+    except Exception as exc:
+
+        return {
+            "ok": False,
+            "error": str(exc)[:500],
+        }
+
+
+# ============================================================
+# GITHUB FILE READING
+# ============================================================
+
+async def read_repo_file(path):
+
+    try:
+
+        safe_path = safe_repo_path(path)
+
+        if not safe_path:
+            return {
+                "ok": False,
+                "error": "A file path is required."
+            }
+
+        result = await github_request(safe_path)
+
+        if not result.get("ok"):
+            return result
+
+        data = result["data"]
+
+        if (
+            isinstance(data, list)
+            or data.get("type") != "file"
+        ):
+            return {
+                "ok": False,
+                "error": "The requested path is not a file."
+            }
+
+        encoded = data.get("content", "")
+
+        if encoded.strip():
+
+            content = base64.b64decode(
+                encoded
+            ).decode("utf-8")
+
+        else:
+
+            download_url = data.get("download_url")
+
+            if not download_url:
+                return {
+                    "ok": False,
+                    "error": "File content is unavailable."
+                }
+
+            # Only download from GitHub's official raw host.
+            if not download_url.startswith(
+                "https://raw.githubusercontent.com/"
+            ):
+                return {
+                    "ok": False,
+                    "error": "Untrusted download URL rejected."
+                }
+
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.get(download_url)
+
+            if response.status_code >= 400:
+                return {
+                    "ok": False,
+                    "error": "Could not download repository file."
+                }
+
+            content = response.text
+
+        if len(content.encode("utf-8")) > MAX_FILE_BYTES:
+            return {
+                "ok": False,
+                "error": "File exceeds the 200 KB read limit."
+            }
+
+        return {
+            "ok": True,
+            "repository": GITHUB_REPOSITORY,
+            "branch": GITHUB_BRANCH,
+            "path": safe_path,
+            "content": content,
+        }
+
+    except UnicodeDecodeError:
+
+        return {
+            "ok": False,
+            "error": "File is not UTF-8 text."
+        }
+
+    except Exception as exc:
+
+        return {
+            "ok": False,
+            "error": str(exc)[:500],
+        }
+
+
+# ============================================================
+# TOOL DEFINITIONS
+# ============================================================
+
+def tool_definition(name, description, properties, required=None):
+
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": {
+                "type": "object",
+                "properties": properties,
+                "required": required or [],
+            },
+        },
+    }
+
 
 TOOLS = [
 
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "list_files",
-
-            "description": (
-                "List files in the ARTHER workspace."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "path": {
-                        "type": "string"
-                    }
-
-                },
-
-                "required": [],
-
-            },
-
+    tool_definition(
+        "list_files",
+        "List files in the temporary ARTHER workspace.",
+        {
+            "path": {"type": "string"}
         },
-    },
+    ),
 
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "read_file",
-
-            "description": (
-                "Read a UTF-8 file in the workspace."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "path": {
-                        "type": "string"
-                    }
-
-                },
-
-                "required": ["path"],
-
-            },
-
+    tool_definition(
+        "read_file",
+        "Read a UTF-8 file from the ARTHER workspace.",
+        {
+            "path": {"type": "string"}
         },
-    },
+        ["path"],
+    ),
 
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "write_file",
-
-            "description": (
-                "Create or replace a UTF-8 file."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "path": {
-                        "type": "string"
-                    },
-
-                    "content": {
-                        "type": "string"
-                    },
-
-                },
-
-                "required": [
-                    "path",
-                    "content"
-                ],
-
-            },
-
+    tool_definition(
+        "write_file",
+        "Create a new UTF-8 file in the workspace. Existing files cannot be overwritten.",
+        {
+            "path": {"type": "string"},
+            "content": {"type": "string"},
         },
-    },
+        ["path", "content"],
+    ),
 
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "save_memory",
-
-            "description": (
-                "Save a fact to permanent PostgreSQL memory."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "content": {
-                        "type": "string"
-                    },
-
-                    "category": {
-                        "type": "string"
-                    },
-
-                },
-
-                "required": ["content"],
-
-            },
-
+    tool_definition(
+        "list_repo_files",
+        "List files and directories in the configured GitHub repository. Read-only.",
+        {
+            "path": {"type": "string"}
         },
-    },
+    ),
 
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "search_memories",
-
-            "description": (
-                "Search persistent PostgreSQL memories."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "query": {
-                        "type": "string"
-                    },
-
-                    "limit": {
-                        "type": "integer"
-                    },
-
-                },
-
-                "required": [],
-
-            },
-
+    tool_definition(
+        "read_repo_file",
+        "Read a UTF-8 file from the configured GitHub repository. Read-only.",
+        {
+            "path": {"type": "string"}
         },
-    },
+        ["path"],
+    ),
+
+    tool_definition(
+        "save_memory",
+        "Save a fact to permanent PostgreSQL memory.",
+        {
+            "content": {"type": "string"},
+            "category": {"type": "string"},
+        },
+        ["content"],
+    ),
+
+    tool_definition(
+        "search_memories",
+        "Search persistent PostgreSQL memories.",
+        {
+            "query": {"type": "string"},
+            "limit": {"type": "integer"},
+        },
+    ),
 
 ]
 
@@ -506,29 +627,69 @@ TOOLS = [
 async def call_tool(name, arguments):
 
     if name == "list_files":
-
         return list_files(**arguments)
 
     if name == "read_file":
-
         return read_file(**arguments)
 
     if name == "write_file":
-
         return write_file(**arguments)
 
-    if name == "save_memory":
+    if name == "list_repo_files":
+        return await list_repo_files(**arguments)
 
+    if name == "read_repo_file":
+        return await read_repo_file(**arguments)
+
+    if name == "save_memory":
         return await save_memory(**arguments)
 
     if name == "search_memories":
-
         return await search_memories(**arguments)
 
     return {
         "ok": False,
         "error": "Unknown tool"
     }
+
+
+# ============================================================
+# PROVIDER REQUEST
+# ============================================================
+
+async def ask_agent(client, messages):
+
+    response = await client.post(
+        f"{BASE_URL}/chat/completions",
+        headers={
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": MODEL,
+            "messages": messages,
+            "tools": TOOLS,
+            "tool_choice": "auto",
+            "temperature": 0.2,
+        },
+    )
+
+    if response.status_code >= 400:
+        raise RuntimeError(
+            "AI provider error: "
+            + response.text[:1200]
+        )
+
+    data = response.json()
+
+    choices = data.get("choices") or []
+
+    if not choices:
+        raise RuntimeError(
+            "AI provider returned no choices."
+        )
+
+    return choices[0]["message"]
 
 
 # ============================================================
@@ -542,7 +703,6 @@ async def run_agent(
 ):
 
     if not API_KEY:
-
         raise RuntimeError(
             "AI_API_KEY is not configured."
         )
@@ -563,7 +723,7 @@ async def run_agent(
     )
 
     # --------------------------------------------------------
-    # DETERMINISTIC MEMORY SAVE
+    # SAVE MEMORY
     # --------------------------------------------------------
 
     if is_memory_save_request(prompt):
@@ -571,7 +731,6 @@ async def run_agent(
         content = extract_memory_content(prompt)
 
         if not content:
-
             answer = (
                 "لم أتمكن من تحديد المعلومة المطلوب حفظها."
             )
@@ -596,27 +755,18 @@ async def run_agent(
         )
 
         tool_log.append({
-
             "tool": "save_memory",
             "result": result,
-
         })
 
         if result.get("ok"):
-
             answer = (
-                "تم حفظ المعلومة في الذاكرة الدائمة "
-                "بقاعدة البيانات PostgreSQL."
+                "تم حفظ المعلومة في الذاكرة الدائمة."
             )
-
         else:
-
             answer = (
-                "فشل حفظ المعلومة في الذاكرة الدائمة: "
-                + result.get(
-                    "error",
-                    "خطأ غير معروف"
-                )
+                "فشل حفظ المعلومة: "
+                + str(result.get("error", "Unknown error"))
             )
 
         await save_message(
@@ -626,17 +776,15 @@ async def run_agent(
         )
 
         return {
-
             "success": True,
             "answer": answer,
             "tool_calls": tool_log,
             "rounds": 1,
             "session_id": session_id,
-
         }
 
     # --------------------------------------------------------
-    # DETERMINISTIC MEMORY RETRIEVAL
+    # SEARCH MEMORY
     # --------------------------------------------------------
 
     if is_memory_search_request(prompt):
@@ -646,37 +794,28 @@ async def run_agent(
             limit=20
         )
 
-        result = {
-
-            "ok": True,
-            "count": len(rows),
-            "memories": rows,
-
-        }
+        rows = rows or []
 
         tool_log.append({
-
             "tool": "search_memories",
-            "result": result,
-
+            "result": {
+                "ok": True,
+                "count": len(rows),
+                "memories": rows,
+            },
         })
 
         if rows:
-
             answer = (
-                "هذه المعلومات الموجودة في ذاكرتي الدائمة:\n"
+                "هذه المعلومات الموجودة في ذاكرتي:\n"
+                + "\n".join(
+                    f"- {row['content']}"
+                    for row in rows
+                )
             )
-
-            answer += "\n".join(
-                f"- {row['content']}"
-                for row in rows
-            )
-
         else:
-
             answer = (
-                "لا توجد معلومات محفوظة حالياً "
-                "في الذاكرة الدائمة."
+                "لا توجد معلومات محفوظة حالياً."
             )
 
         await save_message(
@@ -686,17 +825,15 @@ async def run_agent(
         )
 
         return {
-
             "success": True,
             "answer": answer,
             "tool_calls": tool_log,
             "rounds": 1,
             "session_id": session_id,
-
         }
 
     # --------------------------------------------------------
-    # LOAD LONG-TERM MEMORY CONTEXT
+    # LOAD MEMORY CONTEXT
     # --------------------------------------------------------
 
     memory_context = await get_memory_context(
@@ -706,21 +843,17 @@ async def run_agent(
     system = SYSTEM_PROMPT
 
     if memory_context:
-
         system += (
             "\n\nKNOWN LONG-TERM MEMORIES:\n"
-            + memory_context
+            + str(memory_context)
         )
 
     messages = [
-
         {
             "role": "system",
             "content": system,
         },
-
         *history,
-
         {
             "role": "user",
             "content": (
@@ -728,7 +861,6 @@ async def run_agent(
                 f"Task: {prompt}"
             ),
         },
-
     ]
 
     # --------------------------------------------------------
@@ -738,8 +870,6 @@ async def run_agent(
     async with httpx.AsyncClient(
         timeout=90
     ) as client:
-
-        # CREATE EXECUTION PLAN
 
         plan = await create_plan(
             client,
@@ -751,102 +881,40 @@ async def run_agent(
         )
 
         messages.append({
-
             "role": "system",
-
             "content": (
-                "EXECUTION PLAN. "
-                "Follow this plan safely. "
-                "Use available tools when necessary.\n"
+                "EXECUTION PLAN. Follow it safely. "
+                "Use tools when necessary. "
+                "Never claim an operation succeeded without its result.\n"
                 + json.dumps(
                     plan,
                     ensure_ascii=False
                 )
             ),
-
         })
 
-        # EXECUTION LOOP
+        for round_number in range(MAX_TOOL_ROUNDS):
 
-        for round_number in range(
-            MAX_TOOL_ROUNDS
-        ):
-
-            response = await client.post(
-
-                f"{BASE_URL}/chat/completions",
-
-                headers={
-
-                    "Authorization": (
-                        f"Bearer {API_KEY}"
-                    )
-
-                },
-
-                json={
-
-                    "model": MODEL,
-
-                    "messages": messages,
-
-                    "tools": TOOLS,
-
-                    "tool_choice": "auto",
-
-                    "temperature": 0.2,
-
-                },
-
+            message = await ask_agent(
+                client,
+                messages
             )
 
-            if response.status_code >= 400:
-
-                raise RuntimeError(
-                    "AI provider error: "
-                    + response.text[:800]
-                )
-
-            data = response.json()
-
-            message = data["choices"][0]["message"]
-
-            messages.append(message)
-
-            calls = message.get(
-                "tool_calls"
-            ) or []
-
-            # ------------------------------------------------
-            # NO MORE TOOL CALLS
-            # ------------------------------------------------
+            calls = message.get("tool_calls") or []
 
             if not calls:
 
-                answer = (
-                    message.get("content") or ""
-                )
-
-                # VERIFY EXECUTION
+                answer = message.get("content") or ""
 
                 verification = await verify_execution(
-
                     client,
-
                     BASE_URL,
-
                     API_KEY,
-
                     MODEL,
-
                     prompt,
-
                     plan,
-
                     tool_log,
-
                     answer,
-
                 )
 
                 await save_message(
@@ -856,43 +924,25 @@ async def run_agent(
                 )
 
                 return {
-
                     "success": True,
-
                     "answer": answer,
-
                     "plan": plan,
-
                     "planning_status": plan.get(
                         "status",
-                        "planned"
+                        "unknown"
                     ),
-
                     "verification": verification,
-
                     "tool_calls": tool_log,
-
                     "rounds": round_number + 1,
-
                     "session_id": session_id,
-
                 }
 
-            # ------------------------------------------------
-            # EXECUTE REQUESTED TOOLS
-            # ------------------------------------------------
+            messages.append(message)
 
             for call in calls:
 
-                function = call.get(
-                    "function",
-                    {}
-                )
-
-                name = function.get(
-                    "name",
-                    ""
-                )
+                function = call.get("function", {})
+                name = function.get("name", "")
 
                 try:
 
@@ -902,7 +952,7 @@ async def run_agent(
 
                     if not isinstance(arguments, dict):
                         raise ValueError(
-                            "Tool arguments must be a JSON object"
+                            "Tool arguments must be a JSON object."
                         )
 
                     result = await call_tool(
@@ -913,45 +963,31 @@ async def run_agent(
                 except Exception as exc:
 
                     result = {
-
                         "ok": False,
-
                         "error": str(exc),
-
                     }
 
                 tool_log.append({
-
                     "tool": name,
-
                     "result": result,
-
                 })
 
                 messages.append({
-
                     "role": "tool",
-
                     "tool_call_id": call["id"],
-
                     "content": json.dumps(
-
                         result,
-
                         ensure_ascii=False,
-
                         default=str,
-
                     ),
-
                 })
 
     # --------------------------------------------------------
-    # MAXIMUM TOOL ROUNDS REACHED
+    # MAXIMUM ROUNDS
     # --------------------------------------------------------
 
     answer = (
-        "وصل ARTHER إلى الحد الأقصى لجولات الأدوات. "
+        "وصل ARTHER إلى الحد الأقصى لجولات التنفيذ. "
         "لم يتم التأكد من اكتمال جميع الخطوات."
     )
 
@@ -962,34 +998,18 @@ async def run_agent(
     )
 
     return {
-
         "success": True,
-
         "answer": answer,
-
         "plan": plan,
-
-        "planning_status": plan.get(
-            "status",
-            "planned"
-        ),
-
+        "planning_status": plan.get("status", "unknown"),
         "verification": {
-
             "status": "partial",
-
             "checks": [],
-
-            "note": (
-                "تم الوصول إلى الحد الأقصى لجولات التنفيذ."
-            ),
-
+            "completed_steps": [],
+            "failed_steps": [],
+            "note": "Maximum tool rounds reached.",
         },
-
         "tool_calls": tool_log,
-
         "rounds": MAX_TOOL_ROUNDS,
-
         "session_id": session_id,
-
     }
