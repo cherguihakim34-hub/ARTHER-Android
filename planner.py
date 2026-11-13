@@ -3,11 +3,8 @@ import json
 import re
 
 
-# ============================================================
-# JSON RESPONSE PARSER
-# ============================================================
-
 def _json_object(raw):
+
     if isinstance(raw, dict):
         return raw
 
@@ -22,8 +19,10 @@ def _json_object(raw):
 
     try:
         result = json.loads(content)
+
         if isinstance(result, dict):
             return result
+
     except Exception:
         pass
 
@@ -34,10 +33,13 @@ def _json_object(raw):
     )
 
     if match:
+
         try:
             result = json.loads(match.group(0))
+
             if isinstance(result, dict):
                 return result
+
         except Exception:
             pass
 
@@ -47,7 +49,7 @@ def _json_object(raw):
 
 
 # ============================================================
-# GROQ API REQUEST
+# AI REQUEST
 # ============================================================
 
 async def _ask(
@@ -58,6 +60,7 @@ async def _ask(
     system,
     user,
 ):
+
     url = (
         f"{base_url.rstrip('/')}/chat/completions"
     )
@@ -84,10 +87,6 @@ async def _ask(
         "reasoning_effort": "low",
     }
 
-    # --------------------------------------------------------
-    # ATTEMPT 1: JSON MODE
-    # --------------------------------------------------------
-
     first_payload = {
         **payload,
         "response_format": {
@@ -107,7 +106,6 @@ async def _ask(
 
         first_error = response.text[:1500]
 
-        # Retry without JSON mode.
         response = await client.post(
             url,
             headers=headers,
@@ -126,21 +124,12 @@ async def _ask(
     choices = data.get("choices") or []
 
     if not choices:
-
         raise ValueError(
-            "Groq returned no choices. "
-            f"Response: {str(data)[:1500]}"
+            "Groq returned no choices."
         )
 
-    message = (
-        choices[0].get("message") or {}
-    )
-
+    message = choices[0].get("message") or {}
     content = message.get("content")
-
-    # --------------------------------------------------------
-    # ATTEMPT 3: RETRY EMPTY RESPONSE
-    # --------------------------------------------------------
 
     if not content:
 
@@ -156,48 +145,26 @@ async def _ask(
         )
 
         if retry.status_code >= 400:
-
             raise RuntimeError(
                 "Groq retry failed: "
-                f"{retry.status_code} "
-                f"{retry.text[:1500]}"
+                + retry.text[:1500]
             )
 
         retry_data = retry.json()
-
-        retry_choices = (
-            retry_data.get("choices") or []
-        )
+        retry_choices = retry_data.get("choices") or []
 
         if not retry_choices:
-
             raise ValueError(
                 "Groq retry returned no choices."
             )
 
         retry_choice = retry_choices[0]
-
-        message = (
-            retry_choice.get("message") or {}
-        )
-
+        message = retry_choice.get("message") or {}
         content = message.get("content")
 
         if not content:
-
-            finish_reason = retry_choice.get(
-                "finish_reason"
-            )
-
-            usage = retry_data.get(
-                "usage",
-                {},
-            )
-
             raise ValueError(
-                "Groq returned empty content after retry. "
-                f"finish_reason={finish_reason}; "
-                f"usage={usage}"
+                "Groq returned empty content after retry."
             )
 
     if isinstance(content, list):
@@ -209,7 +176,6 @@ async def _ask(
         )
 
     if not content:
-
         raise ValueError(
             "Groq returned empty text content."
         )
@@ -229,23 +195,22 @@ async def create_plan(
     prompt,
     language="auto",
 ):
+
     system = """
 You are ARTHER's planning engine.
 
-IMPORTANT:
 You are a TEXT-ONLY PLANNER.
 
 You do not have access to tools.
-You must NEVER call, request, or simulate a function.
-You must NEVER produce tool calls.
-You must NEVER execute actions.
+Never call or simulate a function.
+Never produce tool calls.
+Never execute actions.
 
-Your ONLY task is to create a written execution plan.
+Your only task is to create a written execution plan.
 
-Analyze the user's objective and divide it into
-1 to 7 clear, practical, ordered steps.
+Divide the user's objective into 1 to 7 practical steps.
 
-Return ONLY a JSON object as plain text.
+Return ONLY a valid JSON object.
 
 Required structure:
 
@@ -256,36 +221,35 @@ Required structure:
         {
             "id": 1,
             "description": "Step description",
-            "tools": ["list_files"],
+            "tools": ["list_repo_files"],
             "expected_result": "Expected result"
         }
     ]
 }
-
-The tools field is only a text label describing which
-existing ARTHER capability may be needed later.
-
-It is NOT an instruction to call that capability.
 
 Available capability labels:
 
 - list_files
 - read_file
 - write_file
+- list_repo_files
+- read_repo_file
 - save_memory
 - search_memories
 - none
 
-RULES:
+The tools field is only a text label.
+It does not call or execute anything.
+
+Rules:
 
 1. Never invent tools.
 2. Never claim that a step was executed.
-3. Never invent execution results.
+3. Never invent results.
 4. Never propose arbitrary shell commands.
 5. Never propose destructive actions without approval.
-6. Never generate function calls.
-7. Return valid JSON only.
-8. Use the language requested by the user.
+6. Return valid JSON only.
+7. Use the requested language.
 """
 
     request = {
@@ -313,7 +277,6 @@ RULES:
             not isinstance(steps, list)
             or not steps
         ):
-
             raise ValueError(
                 "Planner returned no valid steps."
             )
@@ -322,6 +285,8 @@ RULES:
             "list_files",
             "read_file",
             "write_file",
+            "list_repo_files",
+            "read_repo_file",
             "save_memory",
             "search_memories",
             "none",
@@ -329,10 +294,7 @@ RULES:
 
         clean_steps = []
 
-        for index, step in enumerate(
-            steps[:7],
-            1,
-        ):
+        for index, step in enumerate(steps[:7], 1):
 
             if not isinstance(step, dict):
                 continue
@@ -353,16 +315,13 @@ RULES:
 
             clean_steps.append({
                 "id": index,
-
                 "description": str(
                     step.get(
                         "description",
                         "Execute task step",
                     )
                 )[:500],
-
                 "tools": clean_tools,
-
                 "expected_result": str(
                     step.get(
                         "expected_result",
@@ -372,28 +331,18 @@ RULES:
             })
 
         if not clean_steps:
-
             raise ValueError(
                 "Planner produced no usable steps."
             )
 
         return {
             "objective": str(
-                result.get(
-                    "objective",
-                    prompt,
-                )
+                result.get("objective", prompt)
             )[:1000],
-
             "reasoning_summary": str(
-                result.get(
-                    "reasoning_summary",
-                    "",
-                )
+                result.get("reasoning_summary", "")
             )[:1000],
-
             "steps": clean_steps,
-
             "status": "planned",
         }
 
@@ -401,31 +350,24 @@ RULES:
 
         return {
             "objective": prompt[:1000],
-
             "reasoning_summary": (
                 "Planning failed. "
                 "A safe fallback was generated."
             ),
-
             "steps": [
                 {
                     "id": 1,
-
                     "description": (
                         "Handle the request using "
                         "available agent capabilities."
                     ),
-
                     "tools": ["none"],
-
                     "expected_result": (
                         "Respond safely to the user."
                     ),
                 }
             ],
-
             "status": "fallback",
-
             "planner_error": str(exc)[:2000],
         }
 
@@ -450,10 +392,7 @@ async def verify_execution(
         for item in tool_log
         if (
             isinstance(item, dict)
-            and isinstance(
-                item.get("result"),
-                dict,
-            )
+            and isinstance(item.get("result"), dict)
             and item["result"].get("ok") is True
         )
     ]
@@ -463,52 +402,26 @@ async def verify_execution(
         for item in tool_log
         if (
             isinstance(item, dict)
-            and isinstance(
-                item.get("result"),
-                dict,
-            )
+            and isinstance(item.get("result"), dict)
             and item["result"].get("ok") is False
         )
     ]
 
-    # --------------------------------------------------------
-    # FALLBACK PLAN PROTECTION
-    # --------------------------------------------------------
-
     if plan.get("status") == "fallback":
 
-        status = (
-            "partial"
-            if successful_tools
-            else "blocked"
-        )
-
         return {
-            "status": status,
-
+            "status": (
+                "partial"
+                if successful_tools
+                else "blocked"
+            ),
             "checks": [
-                (
-                    "The planning engine failed; "
-                    "fallback was used."
-                ),
-
-                (
-                    f"Successful tool calls: "
-                    f"{len(successful_tools)}."
-                ),
-
-                (
-                    f"Failed tool calls: "
-                    f"{len(failed_tools)}."
-                ),
+                "The planning engine failed; fallback was used.",
+                f"Successful tool calls: {len(successful_tools)}.",
+                f"Failed tool calls: {len(failed_tools)}.",
             ],
-
             "completed_steps": [],
-
-            "failed_steps": [
-                "Planning"
-            ],
-
+            "failed_steps": ["Planning"],
             "note": (
                 "Execution cannot be declared fully completed "
                 "because the planning engine did not produce "
@@ -516,16 +429,12 @@ async def verify_execution(
             ),
         }
 
-    # --------------------------------------------------------
-    # VERIFICATION PROMPT
-    # --------------------------------------------------------
-
     system = """
 You are ARTHER's execution verification engine.
 
 Verify only facts supported by tool results.
 
-RULES:
+Rules:
 
 1. Never invent successful operations.
 2. Never claim a file was read or written without evidence.
@@ -547,7 +456,6 @@ Return JSON only:
 }
 
 Allowed statuses:
-
 - completed
 - partial
 - blocked
@@ -592,14 +500,8 @@ Allowed statuses:
             status = "unverified"
 
         checks = result.get("checks", [])
-        completed = result.get(
-            "completed_steps",
-            [],
-        )
-        failed = result.get(
-            "failed_steps",
-            [],
-        )
+        completed = result.get("completed_steps", [])
+        failed = result.get("failed_steps", [])
 
         if not isinstance(checks, list):
             checks = []
@@ -610,22 +512,17 @@ Allowed statuses:
         if not isinstance(failed, list):
             failed = []
 
-        # Protect against unsupported completion.
         if status == "completed" and not successful_tools:
             status = "unverified"
 
         return {
             "status": status,
-
             "checks": [
                 str(item)[:500]
                 for item in checks[:10]
             ],
-
             "completed_steps": completed[:10],
-
             "failed_steps": failed[:10],
-
             "note": str(
                 result.get("note", "")
             )[:1000],
@@ -639,16 +536,12 @@ Allowed statuses:
                 if successful_tools
                 else "unverified"
             ),
-
             "checks": [],
-
             "completed_steps": [],
-
             "failed_steps": [],
-
             "note": (
                 "Automatic verification failed: "
-                f"{str(exc)[:1000]}"
+                + str(exc)[:1000]
             ),
         }
 
@@ -660,7 +553,6 @@ Allowed statuses:
 def format_plan(plan):
 
     if not isinstance(plan, dict):
-
         return "No execution plan available."
 
     lines = [
