@@ -1,12 +1,15 @@
 
 import os
 import httpx
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from agent_core import run_agent
+
 APP_NAME = "ARTHER"
-VERSION = "3.0.0"
+VERSION = "3.1.0"
 
 API_KEY = os.getenv("AI_API_KEY", "")
 BASE_URL = os.getenv(
@@ -31,6 +34,11 @@ app.add_middleware(
 
 
 class AnalyzeRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=12000)
+    language: str = "auto"
+
+
+class AgentRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=12000)
     language: str = "auto"
 
@@ -82,7 +90,8 @@ async def health():
         "version": VERSION,
         "status": "online",
         "ai_configured": bool(API_KEY),
-        "model": MODEL
+        "model": MODEL,
+        "agent_core": True
     }
 
 
@@ -150,9 +159,55 @@ async def analyze(request: AnalyzeRequest):
         )
 
 
+@app.post("/api/agent")
+async def agent(request: AgentRequest):
+    if not API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="AI_API_KEY is not configured on the server."
+        )
+
+    try:
+        result = await run_agent(
+            prompt=request.prompt,
+            language=request.language
+        )
+
+        return {
+            "success": True,
+            "agent": APP_NAME,
+            "version": VERSION,
+            **result
+        }
+
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="The agent or AI provider timed out."
+        )
+
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=502,
+            detail=str(error)
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Agent execution failed: {str(error)}"
+        )
+
+
 @app.post("/api/experiment")
 async def experiment(request: ExperimentRequest):
-    if os.getenv("ALLOW_REMOTE_EXECUTION", "false").lower() != "true":
+    if os.getenv(
+        "ALLOW_REMOTE_EXECUTION",
+        "false"
+    ).lower() != "true":
         raise HTTPException(
             status_code=403,
             detail=(
@@ -165,4 +220,3 @@ async def experiment(request: ExperimentRequest):
         status_code=501,
         detail="A secure isolated execution sandbox is not installed yet."
     )
-
