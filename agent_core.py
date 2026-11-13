@@ -1,4 +1,3 @@
-
 import json
 import os
 from pathlib import Path
@@ -6,30 +5,43 @@ from typing import Any
 
 import httpx
 
+from memory_store import get_history, save_message
+
 BASE_URL = os.getenv(
     "AI_BASE_URL",
     "https://api.groq.com/openai/v1"
 ).rstrip("/")
+
 MODEL = os.getenv("AI_MODEL", "openai/gpt-oss-120b")
 API_KEY = os.getenv("AI_API_KEY", "")
+
 MAX_TOOL_ROUNDS = 5
 MAX_FILE_BYTES = 200_000
 
-# مساحة عمل معزولة على الخادم، وليست ملفات الهاتف.
 WORKSPACE = Path(
     os.getenv("ARTHER_WORKSPACE", "/tmp/arther_workspace")
 ).resolve()
+
 WORKSPACE.mkdir(parents=True, exist_ok=True)
 
 SYSTEM_PROMPT = """
 You are ARTHER, a multilingual research and engineering agent.
-Plan before acting. Use available tools when useful.
-Work only inside the ARTHER workspace.
-Never claim access to the user's phone, GitHub or internet
-unless a connected tool actually provides that access.
-Explain actions and results honestly.
-Ask for confirmation before destructive actions.
-Reply in Arabic, French or English according to the user.
+
+Your mission:
+- Think critically and plan before acting.
+- Break complex tasks into practical steps.
+- Use available tools when useful.
+- Test actions and verify their results.
+- Identify errors and attempt safe corrections.
+- Never claim actions you did not perform.
+- Work only inside the ARTHER workspace.
+- Never claim access to the user's phone, GitHub or internet
+  unless a connected tool actually provides that access.
+- Ask for confirmation before destructive actions.
+- Reply in Arabic, French or English according to the user.
+
+You have access to conversation history supplied by the backend.
+Use it to maintain continuity, but do not invent missing memories.
 """
 
 
@@ -132,7 +144,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "write_file",
-            "description": "Create or replace a UTF-8 file in the workspace.",
+            "description": "Create or replace a UTF-8 file.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -159,22 +171,34 @@ def call_tool(name: str, arguments: dict) -> dict:
     return {"ok": False, "error": "Unknown tool."}
 
 
-async def run_agent(prompt: str, language: str = "auto") -> dict:
+async def run_agent(
+    prompt: str,
+    language: str = "auto",
+    session_id: str = "default"
+) -> dict:
+
     if not API_KEY:
         raise RuntimeError("AI_API_KEY is not configured.")
 
+    # Retrieve previous conversation before saving this request.
+    history = await get_history(session_id, limit=12)
+
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
+        *history,
         {
             "role": "user",
             "content": f"Language: {language}\nTask: {prompt}"
         }
     ]
 
+    # Save the user's message.
+    await save_message(session_id, "user", prompt)
+
     tool_log = []
 
     async with httpx.AsyncClient(timeout=90) as client:
-        for _ in range(MAX_TOOL_ROUNDS):
+        for round_number in range(MAX_TOOL_ROUNDS):
             response = await client.post(
                 f"{BASE_URL}/chat/completions",
                 headers={
@@ -201,11 +225,22 @@ async def run_agent(prompt: str, language: str = "auto") -> dict:
             calls = message.get("tool_calls") or []
 
             if not calls:
+                answer = message.get("content") or ""
+
+                # Save the final assistant response.
+                await save_message(
+                    session_id,
+                    "assistant",
+                    answer
+                )
+
                 return {
                     "success": True,
-                    "answer": message.get("content") or "",
+                    "answer": answer,
                     "tool_calls": tool_log,
-                    "rounds": len(tool_log)
+                    "rounds": round_number + 1,
+                    "session_id": session_id,
+                    "memory_enabled": True
                 }
 
             for call in calls:
@@ -217,6 +252,7 @@ async def run_agent(prompt: str, language: str = "auto") -> dict:
                         function.get("arguments") or "{}"
                     )
                     result = call_tool(name, arguments)
+
                 except Exception as exc:
                     result = {
                         "ok": False,
@@ -237,8 +273,15 @@ async def run_agent(prompt: str, language: str = "auto") -> dict:
                     )
                 })
 
+    answer = "وصل الوكيل إلى الحد الأقصى لجولات الأدوات."
+
+    await save_message(session_id, "assistant", answer)
+
     return {
         "success": True,
-        "answer": "وصل الوكيل إلى حد جولات الأدوات.",
-        "tool_calls": tool_log
+        "answer": answer,
+        "tool_calls": tool_log,
+        "rounds": MAX_TOOL_ROUNDS,
+        "session_id": session_id,
+        "memory_enabled": True
     }
