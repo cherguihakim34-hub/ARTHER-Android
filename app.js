@@ -1,3 +1,4 @@
+
 "use strict";
 
 const $ = (id) => document.getElementById(id);
@@ -14,14 +15,12 @@ let apiUrl = (
 
 function showReport(message) {
   if (!report) return;
-
   report.classList.remove("hidden");
   report.textContent = String(message);
 }
 
 function showError(error) {
   const message = error?.message || String(error);
-
   showReport("خطأ: " + message);
 
   if (connection) {
@@ -29,27 +28,20 @@ function showError(error) {
   }
 }
 
-async function requestApi(path, data = null) {
-  const options = {
-    method: data === null ? "GET" : "POST",
-    headers: {
-      "Accept": "application/json"
-    }
-  };
-
-  if (data !== null) {
-    options.headers["Content-Type"] = "application/json";
-    options.body = JSON.stringify(data);
-  }
-
+async function requestApi(path, data) {
   let response;
 
   try {
-    response = await fetch(apiUrl + path, options);
-  } catch (error) {
-    throw new Error(
-      "تعذر الاتصال بالخادم. تحقق من الإنترنت."
-    );
+    response = await fetch(apiUrl + path, {
+      method: data ? "POST" : "GET",
+      headers: {
+        "Accept": "application/json",
+        ...(data ? { "Content-Type": "application/json" } : {})
+      },
+      body: data ? JSON.stringify(data) : undefined
+    });
+  } catch {
+    throw new Error("تعذر الاتصال بالخادم. تحقق من الإنترنت.");
   }
 
   const result = await response.json().catch(() => ({}));
@@ -58,7 +50,6 @@ async function requestApi(path, data = null) {
     throw new Error(
       result.detail ||
       result.message ||
-      result.error ||
       `HTTP ${response.status}`
     );
   }
@@ -79,6 +70,118 @@ function setBusy(button, busy, label) {
   }
 }
 
+function formatAgentResult(result) {
+  const sections = [];
+
+  sections.push(result.answer || "لم يرجع الخادم إجابة.");
+
+  if (result.plan?.steps?.length) {
+    sections.push("\n\n--- خطة التنفيذ ---");
+
+    for (const step of result.plan.steps) {
+      sections.push(
+        `${step.id || ""}. ${step.description || ""}`
+      );
+    }
+  }
+
+  if (result.verification) {
+    sections.push("\n\n--- التحقق ---");
+    sections.push("الحالة: " + result.verification.status);
+
+    if (result.verification.note) {
+      sections.push(result.verification.note);
+    }
+
+    if (result.verification.failed_steps?.length) {
+      sections.push(
+        "العمليات الفاشلة: " +
+        result.verification.failed_steps.join(", ")
+      );
+    }
+  }
+
+  if (Array.isArray(result.tool_calls)) {
+    sections.push(
+      "\nعدد عمليات الأدوات: " + result.tool_calls.length
+    );
+  }
+
+  return sections.join("\n");
+}
+
+async function runArther() {
+  const question = $("question")?.value.trim();
+  const runButton = $("run");
+
+  if (!question) {
+    showError(new Error("اكتب طلبك أولاً."));
+    return;
+  }
+
+  setBusy(runButton, true, "ARTHER يفكر وينفذ...");
+
+  if (connection) {
+    connection.textContent = "ARTHER ينفذ المهمة...";
+  }
+
+  try {
+    const result = await requestApi("/api/agent", {
+      prompt: question,
+      language: "ar",
+      session_id: "arther-web-session"
+    });
+
+    showReport(formatAgentResult(result));
+
+    if (connection) {
+      connection.textContent = result.success
+        ? "اكتملت المهمة"
+        : "انتهى التنفيذ مع وجود مشكلة";
+    }
+  } catch (error) {
+    showError(error);
+  } finally {
+    setBusy(runButton, false);
+  }
+}
+
+const runButton = $("run");
+
+if (runButton) {
+  runButton.addEventListener("click", runArther);
+}
+
+const executeButton = $("execute");
+
+if (executeButton) {
+  executeButton.addEventListener("click", () => {
+    showError(
+      new Error(
+        "تنفيذ Python غير متاح حالياً لأسباب أمنية."
+      )
+    );
+  });
+}
+
+const clearButton = $("clear");
+
+if (clearButton) {
+  clearButton.addEventListener("click", () => {
+    if ($("question")) $("question").value = "";
+    if ($("code")) $("code").value = "";
+
+    if (report) {
+      report.textContent = "";
+      report.classList.add("hidden");
+    }
+
+    if (connection) {
+      connection.textContent = "جاهز";
+    }
+  });
+}
+
 async function checkConnection() {
   if (connection) {
     connection.textContent = "جارٍ الاتصال...";
@@ -92,188 +195,11 @@ async function checkConnection() {
         ? "متصل - ARTHER جاهز"
         : "متصل - مفتاح الذكاء الاصطناعي غير مضبوط";
     }
-
-    return health;
-  } catch (error) {
+  } catch {
     if (connection) {
       connection.textContent = "غير متصل بالخادم";
     }
-
-    return null;
   }
 }
-
-function formatAgentResult(result) {
-  const sections = [];
-
-  sections.push(
-    result.answer || "لم يرجع الخادم إجابة."
-  );
-
-  if (result.plan && Array.isArray(result.plan.steps)) {
-    sections.push("\n\n--- خطة التنفيذ ---");
-
-    for (const step of result.plan.steps) {
-      sections.push(
-        `${step.id}. ${step.description}`
-      );
-    }
-  }
-
-  if (result.verification) {
-    sections.push("\n\n--- التحقق ---");
-    sections.push(
-      "الحالة: " + result.verification.status
-    );
-
-    if (result.verification.note) {
-      sections.push(result.verification.note);
-    }
-  }
-
-  if (Array.isArray(result.tool_calls)) {
-    sections.push(
-      "\nعدد عمليات الأدوات: " +
-      result.tool_calls.length
-    );
-  }
-
-  return sections.join("\n");
-}
-
-// ==================================================
-// NORMAL ANALYSIS
-// ==================================================
-
-const runButton = $("run");
-
-if (runButton) {
-  runButton.addEventListener("click", async () => {
-    const question = $("question")?.value.trim();
-
-    if (!question) {
-      showError(new Error("اكتب سؤالك أولاً."));
-      return;
-    }
-
-    setBusy(runButton, true, "جارٍ التحليل...");
-
-    if (connection) {
-      connection.textContent = "ARTHER يحلل...";
-    }
-
-    try {
-      const result = await requestApi("/api/analyze", {
-        prompt: question,
-        language: "ar"
-      });
-
-      showReport(
-        result.answer || "لم يرجع الخادم إجابة."
-      );
-
-      if (connection) {
-        connection.textContent = "اكتمل التحليل";
-      }
-    } catch (error) {
-      showError(error);
-    } finally {
-      setBusy(runButton, false);
-    }
-  });
-}
-
-// ==================================================
-// FULL AGENT
-// ==================================================
-
-const agentButton = $("agent");
-
-if (agentButton) {
-  agentButton.addEventListener("click", async () => {
-    const question = $("question")?.value.trim();
-
-    if (!question) {
-      showError(new Error("اكتب طلبك أولاً."));
-      return;
-    }
-
-    setBusy(
-      agentButton,
-      true,
-      "جارٍ التفكير والتنفيذ..."
-    );
-
-    if (connection) {
-      connection.textContent = "ARTHER ينفذ المهمة...";
-    }
-
-    try {
-      const result = await requestApi("/api/agent", {
-        prompt: question,
-        language: "ar",
-        session_id: "arther-web-session"
-      });
-
-      showReport(formatAgentResult(result));
-
-      if (connection) {
-        connection.textContent = "انتهت المهمة";
-      }
-    } catch (error) {
-      showError(error);
-    } finally {
-      setBusy(agentButton, false);
-    }
-  });
-}
-
-// ==================================================
-// PYTHON EXPERIMENT
-// ==================================================
-
-const executeButton = $("execute");
-
-if (executeButton) {
-  executeButton.addEventListener("click", () => {
-    showError(
-      new Error(
-        "تنفيذ Python غير متاح حالياً. " +
-        "الخادم يعطّل هذه الميزة لأسباب أمنية."
-      )
-    );
-  });
-}
-
-// ==================================================
-// CLEAR
-// ==================================================
-
-const clearButton = $("clear");
-
-if (clearButton) {
-  clearButton.addEventListener("click", () => {
-    if ($("question")) {
-      $("question").value = "";
-    }
-
-    if ($("code")) {
-      $("code").value = "";
-    }
-
-    if (report) {
-      report.textContent = "";
-      report.classList.add("hidden");
-    }
-
-    if (connection) {
-      connection.textContent = "جاهز";
-    }
-  });
-}
-
-// ==================================================
-// START
-// ==================================================
 
 checkConnection();
