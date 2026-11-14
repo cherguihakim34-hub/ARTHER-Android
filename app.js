@@ -465,6 +465,16 @@ async function runArther() {
 
 if ($("listen")) $("listen").addEventListener("click", startWakeWordMode);
 if ($("run")) $("run").addEventListener("click", runArther);
+if ($("clearText")) $("clearText").addEventListener("click", () => {
+  question.value = "";
+  question.focus();
+});
+if (question) question.addEventListener("keydown", event => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    runArther();
+  }
+});
 
 if ($("stopVoice")) $("stopVoice").addEventListener("click", () => {
   window.ArtherNative?.stopSpeaking?.();
