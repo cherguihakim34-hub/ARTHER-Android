@@ -287,7 +287,7 @@ public class MainActivity extends BridgeActivity {
                             return;
                     }
                     int now = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
-                    deviceResult(true, "مستوى صوت الوسائط الآن " + Math.round(now * 100f / Math.max(1, max)) + بالمئة");
+                    deviceResult(true, "مستوى صوت الوسائط الآن " + Math.round(now * 100f / Math.max(1, max)) + "%");
                 } catch (Exception e) {
                     deviceResult(false, "تعذر تغيير مستوى الصوت");
                 }
