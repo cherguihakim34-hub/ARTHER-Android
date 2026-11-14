@@ -1,204 +1,151 @@
 
 "use strict";
 
-const $ = (id) => document.getElementById(id);
+const API = "https://arther-api.onrender.com";
+const $ = id => document.getElementById(id);
 
 const report = $("report");
+const question = $("question");
 const connection = $("connection");
+const voiceStatus = $("voiceStatus");
 
-const DEFAULT_API_URL = "https://arther-api.onrender.com";
+let busy = false;
 
-let apiUrl = (
-  localStorage.getItem("arther_api_base") ||
-  DEFAULT_API_URL
-).replace(/\/+$/, "");
-
-function showReport(message) {
-  if (!report) return;
+function show(text) {
+  report.textContent = String(text || "");
   report.classList.remove("hidden");
-  report.textContent = String(message);
 }
 
-function showError(error) {
-  const message = error?.message || String(error);
-  showReport("خطأ: " + message);
-
-  if (connection) {
-    connection.textContent = "حدث خطأ";
-  }
-}
-
-async function requestApi(path, data) {
-  let response;
-
-  try {
-    response = await fetch(apiUrl + path, {
-      method: data ? "POST" : "GET",
-      headers: {
-        "Accept": "application/json",
-        ...(data ? { "Content-Type": "application/json" } : {})
-      },
-      body: data ? JSON.stringify(data) : undefined
-    });
-  } catch {
-    throw new Error("تعذر الاتصال بالخادم. تحقق من الإنترنت.");
-  }
-
-  const result = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(
-      result.detail ||
-      result.message ||
-      `HTTP ${response.status}`
-    );
-  }
-
-  return result;
-}
-
-function setBusy(button, busy, label) {
-  if (!button) return;
-
-  button.disabled = busy;
-
-  if (busy) {
-    button.dataset.originalText = button.textContent;
-    button.textContent = label;
-  } else if (button.dataset.originalText) {
-    button.textContent = button.dataset.originalText;
-  }
-}
-
-function formatAgentResult(result) {
-  const sections = [];
-
-  sections.push(result.answer || "لم يرجع الخادم إجابة.");
-
-  if (result.plan?.steps?.length) {
-    sections.push("\n\n--- خطة التنفيذ ---");
-
-    for (const step of result.plan.steps) {
-      sections.push(
-        `${step.id || ""}. ${step.description || ""}`
-      );
-    }
-  }
-
-  if (result.verification) {
-    sections.push("\n\n--- التحقق ---");
-    sections.push("الحالة: " + result.verification.status);
-
-    if (result.verification.note) {
-      sections.push(result.verification.note);
-    }
-
-    if (result.verification.failed_steps?.length) {
-      sections.push(
-        "العمليات الفاشلة: " +
-        result.verification.failed_steps.join(", ")
-      );
-    }
-  }
-
-  if (Array.isArray(result.tool_calls)) {
-    sections.push(
-      "\nعدد عمليات الأدوات: " + result.tool_calls.length
-    );
-  }
-
-  return sections.join("\n");
-}
-
-async function runArther() {
-  const question = $("question")?.value.trim();
-  const runButton = $("run");
-
-  if (!question) {
-    showError(new Error("اكتب طلبك أولاً."));
+function speak(text) {
+  if (window.ArtherNative?.speak) {
+    window.ArtherNative.speak(String(text));
     return;
   }
 
-  setBusy(runButton, true, "ARTHER يفكر وينفذ...");
+  if ("speechSynthesis" in window) {
+    speechSynthesis.cancel();
+    const msg = new SpeechSynthesisUtterance(String(text));
+    msg.lang = "ar-SA";
+    msg.rate = 0.9;
+    speechSynthesis.speak(msg);
+  }
+}
 
-  if (connection) {
-    connection.textContent = "ARTHER ينفذ المهمة...";
+function listen() {
+  if (window.ArtherNative?.startListening) {
+    voiceStatus.textContent = "ARTHER يستمع إليك...";
+    window.ArtherNative.startListening();
+    return;
   }
 
+  const Recognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!Recognition) {
+    show("التعرف على الصوت يحتاج إلى نسخة Android الأصلية.");
+    return;
+  }
+
+  const rec = new Recognition();
+  rec.lang = "ar-DZ";
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+
+  rec.onresult = event => {
+    question.value = event.results[0][0].transcript;
+    voiceStatus.textContent = "تم استقبال الأمر";
+    runArther();
+  };
+
+  rec.onerror = () => {
+    voiceStatus.textContent = "تعذر التعرف على الصوت";
+  };
+
+  rec.onend = () => {
+    if (voiceStatus.textContent === "ARTHER يستمع إليك...")
+      voiceStatus.textContent = "انتهى الاستماع";
+  };
+
+  rec.start();
+}
+
+window.ArtherVoiceResult = function(text) {
+  question.value = text || "";
+  voiceStatus.textContent = "تم استقبال الأمر";
+  if (text) runArther();
+};
+
+async function runArther() {
+  const prompt = question.value.trim();
+  if (!prompt || busy) return;
+
+  busy = true;
+  $("run").disabled = true;
+  connection.textContent = "ARTHER ينفذ...";
+
   try {
-    const result = await requestApi("/api/agent", {
-      prompt: question,
-      language: "ar",
-      session_id: "arther-web-session"
+    const response = await fetch(API + "/api/agent", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        prompt,
+        language: "auto",
+        session_id: "arther-android"
+      })
     });
 
-    showReport(formatAgentResult(result));
+    const data = await response.json();
 
-    if (connection) {
-      connection.textContent = result.success
-        ? "اكتملت المهمة"
-        : "انتهى التنفيذ مع وجود مشكلة";
+    if (!response.ok) {
+      throw new Error(data.detail || "فشل الاتصال بالخادم");
     }
+
+    const answer = data.answer || "لم يصل رد من الخادم.";
+    show(answer);
+    connection.textContent = "متصل";
+
+    speak(answer);
   } catch (error) {
-    showError(error);
+    show("خطأ: " + error.message);
+    connection.textContent = "خطأ في الاتصال";
   } finally {
-    setBusy(runButton, false);
+    busy = false;
+    $("run").disabled = false;
   }
 }
 
-const runButton = $("run");
-
-if (runButton) {
-  runButton.addEventListener("click", runArther);
+function nativeAction(action) {
+  if (!window.ArtherNative?.performAction) {
+    show("التحكم بالهاتف متاح في نسخة Android بعد تثبيت خدمة إمكانية الوصول وتفعيلها.");
+    return;
+  }
+  window.ArtherNative.performAction(action);
 }
 
-const executeButton = $("execute");
+$("listen").addEventListener("click", listen);
+$("run").addEventListener("click", runArther);
 
-if (executeButton) {
-  executeButton.addEventListener("click", () => {
-    showError(
-      new Error(
-        "تنفيذ Python غير متاح حالياً لأسباب أمنية."
-      )
-    );
-  });
-}
+$("stopVoice").addEventListener("click", () => {
+  if (window.ArtherNative?.stopSpeaking)
+    window.ArtherNative.stopSpeaking();
+  if ("speechSynthesis" in window)
+    speechSynthesis.cancel();
+});
 
-const clearButton = $("clear");
-
-if (clearButton) {
-  clearButton.addEventListener("click", () => {
-    if ($("question")) $("question").value = "";
-    if ($("code")) $("code").value = "";
-
-    if (report) {
-      report.textContent = "";
-      report.classList.add("hidden");
-    }
-
-    if (connection) {
-      connection.textContent = "جاهز";
-    }
-  });
-}
+$("home").addEventListener("click", () => nativeAction("HOME"));
+$("back").addEventListener("click", () => nativeAction("BACK"));
+$("scrollDown").addEventListener("click", () => nativeAction("SCROLL_DOWN"));
 
 async function checkConnection() {
-  if (connection) {
-    connection.textContent = "جارٍ الاتصال...";
-  }
-
   try {
-    const health = await requestApi("/health");
-
-    if (connection) {
-      connection.textContent = health.ai_configured
-        ? "متصل - ARTHER جاهز"
-        : "متصل - مفتاح الذكاء الاصطناعي غير مضبوط";
-    }
+    const r = await fetch(API + "/health");
+    if (!r.ok) throw new Error("offline");
+    const h = await r.json();
+    connection.textContent = h.ai_configured
+      ? "ARTHER متصل"
+      : "الخادم متصل والذكاء غير مضبوط";
   } catch {
-    if (connection) {
-      connection.textContent = "غير متصل بالخادم";
-    }
+    connection.textContent = "غير متصل";
   }
 }
 
