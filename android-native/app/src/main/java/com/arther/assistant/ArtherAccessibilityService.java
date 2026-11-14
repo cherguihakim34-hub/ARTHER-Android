@@ -305,12 +305,31 @@ public class ArtherAccessibilityService extends AccessibilityService {
     }
 
     private boolean scroll(boolean down) {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        int action = down
+            ? AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+            : AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD;
+
+        // Prefer the app's own scroll container so nested lists and web views
+        // receive a semantic scroll action before using a screen-wide gesture.
+        if (root != null && scrollNode(root, action)) return true;
+
         float x = getResources().getDisplayMetrics().widthPixels / 2f;
         float h = getResources().getDisplayMetrics().heightPixels;
-
         return swipe(
             x + "," + (down ? h * 0.78f : h * 0.28f) + "," +
             x + "," + (down ? h * 0.28f : h * 0.78f) + ",450"
         );
+    }
+
+    private boolean scrollNode(AccessibilityNodeInfo node, int action) {
+        if (node == null || !node.isVisibleToUser()) return false;
+        if (node.isScrollable() && node.performAction(action)) return true;
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null && scrollNode(child, action)) return true;
+        }
+        return false;
     }
 }
