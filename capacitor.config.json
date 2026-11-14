@@ -1,0 +1,9 @@
+
+{
+  "appId": "com.arther.assistant",
+  "appName": "ARTHER",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}
