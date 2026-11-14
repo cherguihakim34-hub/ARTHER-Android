@@ -75,6 +75,50 @@ public class MainActivity extends BridgeActivity {
             });
         }
 
+
+        @JavascriptInterface
+        public void getCapabilities() {
+            try {
+                JSONObject c = new JSONObject();
+                c.put("microphone", activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED);
+                c.put("camera", activity.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED);
+                c.put("accessibility", ArtherAccessibilityService.isEnabled());
+                boolean running = Shizuku.pingBinder();
+                c.put("shizukuRunning", running);
+                c.put("shizukuGranted", running && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED);
+                String safe = JSONObject.quote(c.toString());
+                webView.post(() -> webView.evaluateJavascript(
+                    "if(window.ArtherCapabilities){window.ArtherCapabilities(" + safe + ");}", null
+                ));
+            } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
+        public void requestMicrophonePermission() {
+            activity.runOnUiThread(() -> {
+                if (activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    sendStatus("إذن الميكروفون ممنوح بالفعل");
+                    getCapabilities();
+                } else {
+                    activity.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 701);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void openAccessibilitySettings() {
+            activity.runOnUiThread(() -> {
+                try {
+                    Intent intent = new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    activity.startActivity(intent);
+                    Toast.makeText(activity, "فعّل خدمة ARTHER Phone Control ثم ارجع إلى التطبيق", Toast.LENGTH_LONG).show();
+                } catch (Exception e) {
+                    Toast.makeText(activity, "تعذر فتح إعدادات إمكانية الوصول", Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+
         @JavascriptInterface
         public void shizukuStatus() {
             boolean running = Shizuku.pingBinder();
