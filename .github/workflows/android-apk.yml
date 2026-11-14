@@ -49,12 +49,12 @@ jobs:
         run: |
           mkdir -p android/app/src/main/java/com/arther/assistant
           mkdir -p android/app/src/main/res/xml
+          mkdir -p android/app/src/main/res/values
 
           cp android-native/app/src/main/java/com/arther/assistant/MainActivity.java android/app/src/main/java/com/arther/assistant/
-
           cp android-native/app/src/main/java/com/arther/assistant/ArtherAccessibilityService.java android/app/src/main/java/com/arther/assistant/
-
           cp android-native/app/src/main/res/xml/arther_accessibility.xml android/app/src/main/res/xml/
+          cp android-native/app/src/main/res/values/arther_strings.xml android/app/src/main/res/values/
 
       - name: Configure permissions
         run: |
