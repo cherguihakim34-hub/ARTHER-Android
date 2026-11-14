@@ -168,3 +168,55 @@ footer {
   .intro h1 { font-size: 24px; }
   .workspace, .report { padding: 14px; }
 }
+
+
+/* Voice-first interface */
+.intro {
+  padding: 58px 0 36px;
+}
+.intro .orb {
+  width: 142px;
+  height: 142px;
+  font-size: 54px;
+  border-width: 2px;
+  box-shadow: 0 0 0 12px #58d9d10b, 0 0 0 28px #58d9d108, 0 0 55px #50d6cf45;
+  animation: artherPulse 3.2s ease-in-out infinite;
+}
+@keyframes artherPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 12px #58d9d10b, 0 0 0 28px #58d9d108, 0 0 55px #50d6cf35; }
+  50% { transform: scale(1.045); box-shadow: 0 0 0 18px #58d9d112, 0 0 0 38px #58d9d10a, 0 0 72px #50d6cf55; }
+}
+.intro h1 { margin: 24px 0 10px; font-size: 30px; }
+.intro p:last-child { font-size: 16px; line-height: 1.8; }
+.workspace {
+  text-align: center;
+  background: transparent;
+  border: 0;
+  padding: 10px 0;
+}
+.workspace > label,
+.workspace #question,
+.workspace .actions {
+  display: none !important;
+}
+.status {
+  display: inline-block;
+  color: var(--cyan);
+  background: #10293a;
+  border: 1px solid #31586a;
+  border-radius: 30px;
+  padding: 12px 20px;
+  font-size: 14px;
+  min-width: 220px;
+}
+.report {
+  max-height: 36vh;
+  overflow-y: auto;
+  font-size: 15px;
+}
+footer { margin-top: 36px; }
+@media (max-width: 520px) {
+  .intro { padding: 48px 0 28px; }
+  .intro .orb { width: 126px; height: 126px; }
+  .intro h1 { font-size: 25px; }
+}
