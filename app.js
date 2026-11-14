@@ -1,4 +1,5 @@
 "use strict";
+// Build sync: speech recognizer provider recovery update.
 
 const API = "https://arther-api.onrender.com";
 const $ = id => document.getElementById(id);
