@@ -10,6 +10,27 @@ const voiceStatus = $("voiceStatus");
 
 let busy = false;
 let lastFlashOn = false;
+let wakeWordMode = true;
+let wakeArmed = false;
+let wakeRestartTimer = null;
+let wakeArmTimer = null;
+
+function scheduleWakeListening(delay = 500) {
+  if (!wakeWordMode || document.hidden) return;
+  clearTimeout(wakeRestartTimer);
+  wakeRestartTimer = setTimeout(() => {
+    if (wakeWordMode && !document.hidden && !busy) {
+      window.ArtherNative?.startListening?.();
+    }
+  }, delay);
+}
+
+function startWakeWordMode() {
+  wakeWordMode = true;
+  wakeArmed = false;
+  voiceStatus.textContent = "بانتظار كلمة آرثر...";
+  scheduleWakeListening(700);
+}
 
 function show(message) {
   report.textContent = String(message || "");
@@ -17,16 +38,22 @@ function show(message) {
 }
 
 function speak(message) {
+  const value = String(message || "");
+  const delay = Math.min(20000, Math.max(1800, value.split(/\\s+/).length * 380));
   if (window.ArtherNative?.speak) {
-    window.ArtherNative.speak(String(message));
+    window.ArtherNative.speak(value);
+    scheduleWakeListening(delay);
     return;
   }
   if ("speechSynthesis" in window) {
     speechSynthesis.cancel();
-    const msg = new SpeechSynthesisUtterance(String(message));
-    msg.lang = "ar-SA";
+    const msg = new SpeechSynthesisUtterance(value);
+    msg.lang = preferredSpeechLanguage();
     msg.rate = 0.9;
+    msg.onend = () => scheduleWakeListening(400);
     speechSynthesis.speak(msg);
+  } else {
+    scheduleWakeListening(1000);
   }
 }
 
@@ -62,9 +89,53 @@ function listen() {
 }
 
 window.ArtherVoiceResult = function(text) {
-  question.value = text || "";
-  voiceStatus.textContent = "تم استقبال الأمر";
-  if (text) runArther();
+  const spoken = String(text || "").trim();
+  if (!spoken) {
+    voiceStatus.textContent = "بانتظار كلمة آرثر...";
+    scheduleWakeListening(450);
+    return;
+  }
+
+  if (!wakeWordMode) {
+    question.value = spoken;
+    voiceStatus.textContent = "تم استقبال الأمر";
+    runArther();
+    return;
+  }
+
+  const normalized = normalizeCommand(spoken);
+  const words = normalized.split(/\\s+/);
+  const wakeWords = new Set(["ارثر", "arther", "arthur", "آرثر"]);
+  const wakeIndex = words.findIndex(word => wakeWords.has(word));
+
+  if (wakeIndex < 0 && !wakeArmed) {
+    voiceStatus.textContent = "بانتظار كلمة آرثر...";
+    scheduleWakeListening(400);
+    return;
+  }
+
+  if (wakeIndex >= 0) {
+    words.splice(wakeIndex, 1);
+    wakeArmed = true;
+    clearTimeout(wakeArmTimer);
+    wakeArmTimer = setTimeout(() => {
+      wakeArmed = false;
+      voiceStatus.textContent = "بانتظار كلمة آرثر...";
+    }, 9000);
+  }
+
+  const command = words.join(" ").trim();
+  if (!command) {
+    voiceStatus.textContent = "نعم، تفضل...";
+    speak("نعم؟");
+    return;
+  }
+
+  wakeArmed = false;
+  clearTimeout(wakeArmTimer);
+  question.value = command;
+  voiceStatus.textContent = "أسمع أمرك...";
+  runArther();
 };
 
 window.ArtherFlashResult = function(success, message) {
@@ -304,7 +375,11 @@ async function runArther() {
   }
 }
 
-$("listen").addEventListener("click", listen);
+$("listen").addEventListener("click", () => {
+  wakeWordMode = false;
+  wakeArmed = false;
+  listen();
+});
 $("run").addEventListener("click", runArther);
 
 $("stopVoice").addEventListener("click", () => {
@@ -342,3 +417,12 @@ async function checkConnection() {
 
 checkConnection();
 if (window.ArtherNative?.shizukuStatus) window.ArtherNative.shizukuStatus();
+if (window.ArtherNative?.startListening) startWakeWordMode();
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    clearTimeout(wakeRestartTimer);
+    return;
+  }
+  if (wakeWordMode) scheduleWakeListening(500);
+});
