@@ -16,6 +16,7 @@ import android.webkit.WebView;
 import android.widget.Toast;
 
 import com.getcapacitor.BridgeActivity;
+import rikka.shizuku.Shizuku;
 import org.json.JSONObject;
 import java.text.Normalizer;
 import java.util.ArrayList;
@@ -26,6 +27,13 @@ import java.util.Set;
 
 public class MainActivity extends BridgeActivity {
     private ArtherBridge artherBridge;
+    private static final int SHIZUKU_REQUEST_CODE = 4102;
+    private final Shizuku.OnRequestPermissionResultListener shizukuPermissionListener = (requestCode, grantResult) -> {
+        if (requestCode == SHIZUKU_REQUEST_CODE && artherBridge != null) {
+            artherBridge.reportShizuku(grantResult == PackageManager.PERMISSION_GRANTED,
+                grantResult == PackageManager.PERMISSION_GRANTED ? "تم منح ARTHER صلاحية Shizuku" : "لم يتم منح صلاحية Shizuku");
+        }
+    };
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -33,6 +41,7 @@ public class MainActivity extends BridgeActivity {
         WebView webView = getBridge().getWebView();
         artherBridge = new ArtherBridge(this, webView);
         webView.addJavascriptInterface(artherBridge, "ArtherNative");
+        Shizuku.addRequestPermissionResultListener(shizukuPermissionListener);
     }
 
     @Override
@@ -308,7 +317,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
-        if (artherBridge != null) {
+        Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener);\n        if (artherBridge != null) {
             if (artherBridge.recognizer != null) artherBridge.recognizer.destroy();
             if (artherBridge.tts != null) artherBridge.tts.shutdown();
         }
