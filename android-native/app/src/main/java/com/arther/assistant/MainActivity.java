@@ -248,6 +248,59 @@ public class MainActivity extends BridgeActivity {
             webView.post(() -> webView.evaluateJavascript(script, null));
         }
 
+        private int previousMusicVolume = -1;
+
+        @JavascriptInterface
+        public void controlVolume(String command) {
+            activity.runOnUiThread(() -> {
+                try {
+                    android.media.AudioManager audio = (android.media.AudioManager)
+                        activity.getSystemService(android.content.Context.AUDIO_SERVICE);
+                    int current = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+                    int max = audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                    String action = command == null ? "" : command.trim().toUpperCase(Locale.ROOT);
+                    switch (action) {
+                        case "UP":
+                            audio.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                                android.media.AudioManager.ADJUST_RAISE, 0);
+                            break;
+                        case "DOWN":
+                            audio.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                                android.media.AudioManager.ADJUST_LOWER, 0);
+                            break;
+                        case "MUTE":
+                            if (current > 0) previousMusicVolume = current;
+                            audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, 0, 0);
+                            break;
+                        case "UNMUTE":
+                            audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                                previousMusicVolume > 0 ? Math.min(previousMusicVolume, max) : Math.max(1, max / 2), 0);
+                            break;
+                        case "MAX":
+                            audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, max, 0);
+                            break;
+                        case "MIN":
+                            audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, 0, 0);
+                            break;
+                        default:
+                            deviceResult(false, "أمر مستوى الصوت غير معروف");
+                            return;
+                    }
+                    int now = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+                    deviceResult(true, "مستوى صوت الوسائط الآن " + Math.round(now * 100f / Math.max(1, max)) + بالمئة");
+                } catch (Exception e) {
+                    deviceResult(false, "تعذر تغيير مستوى الصوت");
+                }
+            });
+        }
+
+        private void deviceResult(boolean success, String message) {
+            String safe = JSONObject.quote(message);
+            webView.post(() -> webView.evaluateJavascript(
+                "if(window.ArtherDeviceResult){window.ArtherDeviceResult(" + success + "," + safe + ");}", null
+            ));
+        }
+
         @JavascriptInterface
         public void speak(String text) {
             activity.runOnUiThread(() -> {
