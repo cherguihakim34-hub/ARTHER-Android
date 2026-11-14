@@ -10,6 +10,7 @@ const connection = $("connection");
 const voiceStatus = $("voiceStatus");
 
 let busy = false;
+let lastFlashOn = false;
 
 function show(message) {
   report.textContent = String(message || "");
@@ -80,8 +81,19 @@ function normalizeCommand(value) {
     .toLowerCase()
     .replace(/[أإآ]/g, "ا")
     .replace(/[ًٌٍَُِّْـ]/g, "")
-    .replace(/[إ]/g, "ا")
+    .replace(/[؟?!.,،]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
+}
+
+function nativeAction(action) {
+  if (!window.ArtherNative?.performAction) {
+    show("التحكم يحتاج إلى نسخة Android الأصلية وتفعيل خدمة إمكانية الوصول.");
+    return false;
+  }
+
+  window.ArtherNative.performAction(action);
+  return true;
 }
 
 function detectFlashCommand(prompt) {
@@ -91,7 +103,7 @@ function detectFlashCommand(prompt) {
     "(?:الفلاش|فلاش|المصباح|الكشاف|ضوء الهاتف|ضو الهاتف|flash|torch|torche)";
 
   const on = new RegExp(
-    "(?:شغل|تشغيل|شغّل|افتح|فتح|ولع|اضئ|انر|شعل|اشعل|قم بتشغيل|turn on|enable|allume|active).*" +
+    "(?:شغل|تشغيل|افتح|فتح|ولع|اضئ|انر|شعل|اشعل|قم بتشغيل|turn on|enable|allume|active).*" +
     target +
     "|" + target +
     ".*(?:شغل|تشغيل|افتح|ولع|اضئ|انر|شعل|on|allume)",
@@ -99,7 +111,7 @@ function detectFlashCommand(prompt) {
   );
 
   const off = new RegExp(
-    "(?:اطف|اطفاء|إطفاء|اغلق|سكر|طفي|طفّي|قم بإطفاء|turn off|disable|eteins|desactive).*" +
+    "(?:اطف|اطفاء|اغلق|سكر|طفي|قم باطفاء|turn off|disable|eteins|desactive).*" +
     target +
     "|" + target +
     ".*(?:اطف|اغلق|سكر|طفي|off|eteins)",
@@ -109,7 +121,112 @@ function detectFlashCommand(prompt) {
   if (on.test(text)) return "ON";
   if (off.test(text)) return "OFF";
 
+  if (
+    lastFlashOn &&
+    /^(اطفئه|اطفيه|طفيه|اغلقه|سكره|اطف|طفي|طف|off)$/.test(text)
+  ) {
+    return "OFF";
+  }
+
   return null;
+}
+
+function executeLocalCommand(prompt) {
+  const text = normalizeCommand(prompt);
+
+  // الفلاش
+  const flash = detectFlashCommand(prompt);
+
+  if (flash) {
+    if (!window.ArtherNative?.setFlash) {
+      show("التحكم بالفلاش غير متاح في هذه النسخة.");
+      speak("التحكم بالفلاش غير متاح.");
+      return true;
+    }
+
+    lastFlashOn = flash === "ON";
+    show(flash === "ON" ? "تشغيل الفلاش..." : "إطفاء الفلاش...");
+    window.ArtherNative.setFlash(flash);
+    return true;
+  }
+
+  // التنقل في الهاتف
+  const navigation = [
+    [/^(الرئيسية|اذهب للرئيسية|الشاشة الرئيسية|home)$/, "HOME"],
+    [/^(رجوع|ارجع|الى الخلف|back)$/, "BACK"],
+    [/^(التطبيقات المفتوحة|التطبيقات الاخيرة|اخر التطبيقات|recent apps)$/, "RECENTS"],
+    [/^(افتح الاشعارات|اظهر الاشعارات|شريط الاشعارات)$/, "NOTIFICATIONS"],
+    [/^(الاعدادات السريعة|لوحة الاختصارات|quick settings)$/, "QUICK_SETTINGS"],
+    [/^(اقفل الهاتف|اقفل الشاشة|قفل الشاشة|lock screen)$/, "LOCK_SCREEN"],
+    [/^(التقط صورة للشاشة|لقطة شاشة|سكرين شوت|screenshot)$/, "TAKE_SCREENSHOT"],
+    [/^(انزل|مرر للاسفل|انزل الصفحة|scroll down)$/, "SCROLL_DOWN"],
+    [/^(اصعد|مرر للاعلى|اصعد الصفحة|scroll up)$/, "SCROLL_UP"]
+  ];
+
+  for (const [pattern, action] of navigation) {
+    if (pattern.test(text)) {
+      nativeAction(action);
+      return true;
+    }
+  }
+
+  // فتح تطبيق
+  const openMatch = text.match(
+    /^(?:افتح|شغل|ابدأ|launch|open)\s+(.+)$/
+  );
+
+  if (openMatch) {
+    const appName = openMatch[1].trim();
+
+    if (window.ArtherNative?.openApp) {
+      window.ArtherNative.openApp(appName);
+      show("جارٍ فتح " + appName);
+    } else {
+      show("فتح التطبيقات غير متاح في هذه النسخة.");
+    }
+
+    return true;
+  }
+
+  // الضغط على عنصر ظاهر بالاسم
+  const clickMatch = text.match(
+    /^(?:اضغط على|انقر على|اختار|اختر|click)\s+(.+)$/
+  );
+
+  if (clickMatch) {
+    nativeAction("CLICK_TEXT:" + clickMatch[1].trim());
+    return true;
+  }
+
+  // الضغط المطول
+  const longClickMatch = text.match(
+    /^(?:اضغط مطولا على|ضغط مطول على|long press)\s+(.+)$/
+  );
+
+  if (longClickMatch) {
+    nativeAction("LONG_CLICK_TEXT:" + longClickMatch[1].trim());
+    return true;
+  }
+
+  // الكتابة في الحقل المحدد
+  const typeMatch = text.match(
+    /^(?:اكتب|اكتب النص|اكتب له|type)\s+(.+)$/
+  );
+
+  if (typeMatch) {
+    const value = typeMatch[1].trim();
+
+    if (window.ArtherNative?.typeText) {
+      window.ArtherNative.typeText(value);
+      show("تم إرسال النص إلى حقل الكتابة المحدد.");
+    } else {
+      show("خدمة الكتابة غير متاحة. فعّل خدمة إمكانية الوصول.");
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 async function runArther() {
@@ -117,24 +234,11 @@ async function runArther() {
 
   if (!prompt || busy) return;
 
-  // تنفيذ الفلاش مباشرة على الهاتف
-  const flashCommand = detectFlashCommand(prompt);
+  if (executeLocalCommand(prompt)) return;
 
-  if (flashCommand) {
-    if (!window.ArtherNative?.setFlash) {
-      show("التحكم بالفلاش غير متاح في هذه النسخة. ثبّت آخر إصدار من ARTHER.");
-      speak("التحكم بالفلاش غير متاح في هذه النسخة.");
-      return;
-    }
-
-    show("جارٍ تنفيذ أمر الفلاش...");
-    window.ArtherNative.setFlash(flashCommand);
-    return;
-  }
-
-  // إرسال بقية الطلبات إلى الذكاء الاصطناعي
   busy = true;
-  $("run").disabled = true;
+
+  if ($("run")) $("run").disabled = true;
   connection.textContent = "ARTHER يعالج طلبك...";
 
   try {
@@ -168,17 +272,8 @@ async function runArther() {
 
   } finally {
     busy = false;
-    $("run").disabled = false;
+    if ($("run")) $("run").disabled = false;
   }
-}
-
-function nativeAction(action) {
-  if (!window.ArtherNative?.performAction) {
-    show("التحكم يحتاج إلى نسخة Android الأصلية.");
-    return;
-  }
-
-  window.ArtherNative.performAction(action);
 }
 
 $("listen").addEventListener("click", listen);
