@@ -86,6 +86,25 @@ jobs:
           p = Path("android/app/src/main/AndroidManifest.xml")
           s = p.read_text()
 
+          # Android 11+ package visibility: allow ARTHER to discover launcher apps.
+          queries = """
+              <queries>
+                  <intent>
+                      <action android:name="android.intent.action.MAIN" />
+                      <category android:name="android.intent.category.LAUNCHER" />
+                  </intent>
+                  <package android:name="com.google.android.youtube" />
+                  <package android:name="com.android.chrome" />
+                  <package android:name="com.whatsapp" />
+                  <package android:name="com.facebook.katana" />
+                  <package android:name="com.sec.android.app.camera" />
+                  <package android:name="com.android.settings" />
+                  <package android:name="com.google.android.apps.maps" />
+              </queries>
+          """
+          if "<queries>" not in s:
+              s = s.replace("<application", queries + "\\n    <application", 1)
+
           permissions = [
               '<uses-permission android:name="android.permission.INTERNET" />',
               '<uses-permission android:name="android.permission.RECORD_AUDIO" />',
