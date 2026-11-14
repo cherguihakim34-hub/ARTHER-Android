@@ -2,6 +2,10 @@ package com.arther.assistant;
 
 import android.Manifest;
 import android.content.Intent;
+import android.net.Uri;
+import android.provider.AlarmClock;
+import android.provider.CalendarContract;
+import android.provider.Settings;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.hardware.camera2.CameraCharacteristics;
@@ -585,6 +589,182 @@ public class MainActivity extends BridgeActivity {
                 appStatus(success,
                     success ? "تم إدخال النص في الحقل المحدد" :
                     "تعذرت الكتابة. افتح حقلاً قابلاً للتحرير وفعّل خدمة إمكانية الوصول");
+            });
+        }
+
+
+        @JavascriptInterface
+        public void openCamera() {
+            activity.runOnUiThread(() -> {
+                try {
+                    Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+                    if (intent.resolveActivity(activity.getPackageManager()) != null)
+                        activity.startActivity(intent);
+                    else appStatus(false, "لم أجد تطبيق كاميرا متاحاً");
+                } catch (Exception e) { appStatus(false, "تعذر فتح الكاميرا"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void openSettings(String page) {
+            activity.runOnUiThread(() -> {
+                String key = page == null ? "" : page.trim().toLowerCase(Locale.ROOT);
+                String action;
+                switch (key) {
+                    case "wifi": action = Settings.ACTION_WIFI_SETTINGS; break;
+                    case "bluetooth": action = Settings.ACTION_BLUETOOTH_SETTINGS; break;
+                    case "display": action = Settings.ACTION_DISPLAY_SETTINGS; break;
+                    case "sound": action = Settings.ACTION_SOUND_SETTINGS; break;
+                    case "location": action = Settings.ACTION_LOCATION_SOURCE_SETTINGS; break;
+                    case "battery": action = Settings.ACTION_BATTERY_SAVER_SETTINGS; break;
+                    case "apps": action = Settings.ACTION_APPLICATION_SETTINGS; break;
+                    default: action = Settings.ACTION_SETTINGS; break;
+                }
+                try { activity.startActivity(new Intent(action)); }
+                catch (Exception e) { appStatus(false, "تعذر فتح صفحة الإعدادات المطلوبة"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void openWeb(String address) {
+            activity.runOnUiThread(() -> {
+                try {
+                    String value = address == null ? "" : address.trim();
+                    if (value.isEmpty()) { appStatus(false, "اذكر عنوان الموقع"); return; }
+                    if (!value.matches("(?i)^https?://.*")) value = "https://" + value;
+                    Uri uri = Uri.parse(value);
+                    if (!"http".equals(uri.getScheme()) && !"https".equals(uri.getScheme())) {
+                        appStatus(false, "نوع الرابط غير مسموح"); return;
+                    }
+                    activity.startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                    appStatus(true, "فتحت الرابط في المتصفح");
+                } catch (Exception e) { appStatus(false, "تعذر فتح الموقع"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void openMap(String query) {
+            activity.runOnUiThread(() -> {
+                try {
+                    String value = query == null ? "" : query.trim();
+                    if (value.isEmpty()) { appStatus(false, "حدد المكان الذي تريد البحث عنه"); return; }
+                    Uri uri = Uri.parse("geo:0,0?q=" + Uri.encode(value));
+                    Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                    if (intent.resolveActivity(activity.getPackageManager()) != null) activity.startActivity(intent);
+                    else activity.startActivity(new Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://www.google.com/maps/search/?api=1&query=" + Uri.encode(value))));
+                    appStatus(true, "فتحت الخرائط للبحث عن " + value);
+                } catch (Exception e) { appStatus(false, "تعذر فتح الخرائط"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void dialPhone(String number) {
+            activity.runOnUiThread(() -> {
+                try {
+                    String value = number == null ? "" : number.replaceAll("[^+0-9]", "");
+                    if (value.length() < 6) { appStatus(false, "رقم الهاتف غير مكتمل"); return; }
+                    activity.startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + value)));
+                    appStatus(true, "فتحت لوحة الاتصال؛ راجع الرقم واضغط اتصال بنفسك");
+                } catch (Exception e) { appStatus(false, "تعذر فتح لوحة الاتصال"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void composeSms(String number, String message) {
+            activity.runOnUiThread(() -> {
+                try {
+                    String value = number == null ? "" : number.replaceAll("[^+0-9]", "");
+                    if (value.length() < 6) { appStatus(false, "رقم الهاتف غير مكتمل"); return; }
+                    Intent intent = new Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + value));
+                    intent.putExtra("sms_body", message == null ? "" : message);
+                    activity.startActivity(intent);
+                    appStatus(true, "جهزت الرسالة؛ راجعها وأرسلها بنفسك");
+                } catch (Exception e) { appStatus(false, "تعذر فتح تطبيق الرسائل"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void createAlarm(String hourValue, String minuteValue, String label) {
+            activity.runOnUiThread(() -> {
+                try {
+                    int hour = Integer.parseInt(hourValue);
+                    int minute = Integer.parseInt(minuteValue);
+                    Intent intent = new Intent(AlarmClock.ACTION_SET_ALARM)
+                        .putExtra(AlarmClock.EXTRA_HOUR, hour)
+                        .putExtra(AlarmClock.EXTRA_MINUTES, minute)
+                        .putExtra(AlarmClock.EXTRA_MESSAGE, label == null ? "ARTHER" : label)
+                        .putExtra(AlarmClock.EXTRA_SKIP_UI, false);
+                    if (intent.resolveActivity(activity.getPackageManager()) != null) activity.startActivity(intent);
+                    else appStatus(false, "لا يوجد تطبيق منبه متاح");
+                } catch (Exception e) { appStatus(false, "تعذر إنشاء المنبه؛ تحقق من الوقت"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void createTimer(String secondsValue) {
+            activity.runOnUiThread(() -> {
+                try {
+                    int seconds = Integer.parseInt(secondsValue);
+                    if (seconds < 1 || seconds > 86400) { appStatus(false, "مدة المؤقت يجب أن تكون بين ثانية و24 ساعة"); return; }
+                    Intent intent = new Intent(AlarmClock.ACTION_SET_TIMER)
+                        .putExtra(AlarmClock.EXTRA_LENGTH, seconds)
+                        .putExtra(AlarmClock.EXTRA_MESSAGE, "ARTHER")
+                        .putExtra(AlarmClock.EXTRA_SKIP_UI, false);
+                    if (intent.resolveActivity(activity.getPackageManager()) != null) activity.startActivity(intent);
+                    else appStatus(false, "لا يوجد تطبيق مؤقت متاح");
+                } catch (Exception e) { appStatus(false, "تعذر تشغيل المؤقت"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void setBrightness(String percentValue) {
+            activity.runOnUiThread(() -> {
+                try {
+                    int percent = Math.max(1, Math.min(100, Integer.parseInt(percentValue)));
+                    if (!Settings.System.canWrite(activity)) {
+                        Intent permission = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                            Uri.parse("package:" + activity.getPackageName()));
+                        activity.startActivity(permission);
+                        appStatus(false, "اسمح لـ ARTHER بتعديل إعدادات النظام ثم أعد أمر السطوع");
+                        return;
+                    }
+                    int value = Math.round(percent * 255f / 100f);
+                    Settings.System.putInt(activity.getContentResolver(), Settings.System.SCREEN_BRIGHTNESS_MODE,
+                        Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL);
+                    boolean changed = Settings.System.putInt(activity.getContentResolver(),
+                        Settings.System.SCREEN_BRIGHTNESS, value);
+                    appStatus(changed, changed ? "تم ضبط سطوع الشاشة على " + percent + "%" :
+                        "تعذر تغيير سطوع الشاشة");
+                } catch (Exception e) { appStatus(false, "تعذر ضبط السطوع"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void createCalendarEvent(String title, long startMillis, long endMillis, String description) {
+            activity.runOnUiThread(() -> {
+                try {
+                    if (endMillis <= startMillis) { appStatus(false, "وقت نهاية الموعد يجب أن يكون بعد بدايته"); return; }
+                    Intent intent = new Intent(Intent.ACTION_INSERT).setData(CalendarContract.Events.CONTENT_URI)
+                        .putExtra(CalendarContract.Events.TITLE, title == null ? "موعد ARTHER" : title)
+                        .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, startMillis)
+                        .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, endMillis)
+                        .putExtra(CalendarContract.Events.DESCRIPTION, description == null ? "" : description);
+                    activity.startActivity(intent);
+                    appStatus(true, "فتحت التقويم لمراجعة الموعد وحفظه");
+                } catch (Exception e) { appStatus(false, "تعذر فتح التقويم"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void shareText(String value) {
+            activity.runOnUiThread(() -> {
+                try {
+                    if (value == null || value.trim().isEmpty()) { appStatus(false, "لا يوجد نص للمشاركة"); return; }
+                    Intent intent = new Intent(Intent.ACTION_SEND).setType("text/plain")
+                        .putExtra(Intent.EXTRA_TEXT, value);
+                    activity.startActivity(Intent.createChooser(intent, "مشاركة عبر"));
+                } catch (Exception e) { appStatus(false, "تعذرت مشاركة النص"); }
             });
         }
 
