@@ -30,6 +30,13 @@ function speak(message) {
   }
 }
 
+function preferredSpeechLanguage() {
+  const language = String(navigator.language || "ar-DZ").toLowerCase();
+  if (language.startsWith("fr")) return "fr-FR";
+  if (language.startsWith("en")) return "en-US";
+  return "ar-DZ";
+}
+
 function listen() {
   if (window.ArtherNative?.startListening) {
     voiceStatus.textContent = "ARTHER يستمع إليك...";
@@ -42,7 +49,7 @@ function listen() {
     return;
   }
   const rec = new Recognition();
-  rec.lang = "ar-DZ";
+  rec.lang = preferredSpeechLanguage();
   rec.interimResults = false;
   rec.maxAlternatives = 1;
   rec.onresult = event => {
