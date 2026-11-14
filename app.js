@@ -434,25 +434,33 @@ async function runArther() {
   }
 }
 
-$("listen").addEventListener("click", startWakeWordMode);
-$("run").addEventListener("click", runArther);
+if ($("listen")) $("listen").addEventListener("click", startWakeWordMode);
+if ($("run")) $("run").addEventListener("click", runArther);
 
-$("stopVoice").addEventListener("click", () => {
+if ($("stopVoice")) $("stopVoice").addEventListener("click", () => {
   window.ArtherNative?.stopSpeaking?.();
   if ("speechSynthesis" in window) speechSynthesis.cancel();
 });
 
-$("home").addEventListener("click", () => nativeAction("HOME"));
-$("back").addEventListener("click", () => nativeAction("BACK"));
-$("scrollDown").addEventListener("click", () => nativeAction("SCROLL_DOWN"));
+if ($("home")) $("home").addEventListener("click", () => nativeAction("HOME"));
+if ($("back")) $("back").addEventListener("click", () => nativeAction("BACK"));
+if ($("scrollDown")) $("scrollDown").addEventListener("click", () => nativeAction("SCROLL_DOWN"));
 
-$("shizuku").addEventListener("click", () => {
+if ($("shizuku")) $("shizuku").addEventListener("click", () => {
   if (!window.ArtherNative?.requestShizukuPermission) {
     show("ميزة Shizuku غير موجودة في هذه النسخة. ثبّت آخر تحديث من ARTHER.");
     return;
   }
   show("جارٍ التحقق من Shizuku وطلب الصلاحية...");
   window.ArtherNative.requestShizukuPermission();
+});
+
+if ($("clear")) $("clear").addEventListener("click", () => {
+  if ($("question")) $("question").value = "";
+  if ($("report")) $("report").classList.add("hidden");
+});
+if ($("execute")) $("execute").addEventListener("click", () => {
+  show("تنفيذ Python غير متاح حالياً على الخادم.");
 });
 
 async function checkConnection() {
