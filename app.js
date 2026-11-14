@@ -25,9 +25,31 @@ function getDeviceSessionId() {
   }
 }
 const SESSION_ID = getDeviceSessionId();
+const CHAT_STORAGE_KEY = "arther_chat_history_v1";
+let chatHistory = [];
 
-function addChatMessage(role, message) {
+function saveChatHistory() {
+  try { localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatHistory.slice(-60))); }
+  catch (_) {}
+}
+
+function renderChatHistory() {
+  if (!chatMessages) return;
+  chatMessages.innerHTML = "";
+  if (!chatHistory.length) {
+    chatMessages.innerHTML = '<p class="chat-empty">ستظهر إجابات ARTHER هنا. يمكنك التحدث أو الكتابة.</p>';
+    return;
+  }
+  chatHistory.slice(-60).forEach(item => addChatMessage(item.role, item.message, false));
+}
+
+function addChatMessage(role, message, persist = true) {
   if (!chatMessages || !String(message || "").trim()) return;
+  if (persist) {
+    chatHistory.push({ role: role === "user" ? "user" : "assistant", message: String(message), at: Date.now() });
+    chatHistory = chatHistory.slice(-60);
+    saveChatHistory();
+  }
   const empty = chatMessages.querySelector(".chat-empty");
   if (empty) empty.remove();
   const bubble = document.createElement("div");
@@ -44,9 +66,22 @@ function addChatMessage(role, message) {
 }
 
 function clearChat() {
+  chatHistory = [];
+  saveChatHistory();
   if (!chatMessages) return;
   chatMessages.innerHTML = '<p class="chat-empty">ستظهر إجابات ARTHER هنا. يمكنك التحدث أو الكتابة.</p>';
 }
+
+try {
+  const saved = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || "[]");
+  if (Array.isArray(saved)) {
+    chatHistory = saved.filter(item =>
+      item && (item.role === "user" || item.role === "assistant") &&
+      typeof item.message === "string"
+    ).slice(-60);
+  }
+} catch (_) { chatHistory = []; }
+renderChatHistory();
 
 let busy = false;
 let lastFlashOn = false;
@@ -465,6 +500,7 @@ async function runArther() {
   const prompt = question.value.trim();
   if (!prompt || busy) return;
   if (executeLocalCommand(prompt)) {
+    addChatMessage("user", prompt);
     scheduleWakeListening(1600);
     return;
   }
