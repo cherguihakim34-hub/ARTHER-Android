@@ -115,7 +115,7 @@ jobs:
               </queries>
           """
           if "<queries>" not in s:
-              s = s.replace("<application", queries + "\\n    <application", 1)
+              s = s.replace("<application", queries + "\n    <application", 1)
 
           permissions = [
               '<uses-permission android:name="android.permission.INTERNET" />',
