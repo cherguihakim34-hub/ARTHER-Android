@@ -79,7 +79,7 @@ public class ArtherAccessibilityService extends AccessibilityService {
         if (value == null) return;
         String line = value.toString().replaceAll("\\s+", " ").trim();
         if (line.isEmpty() || out.indexOf(line) >= 0) return;
-        if (out.length() > 0) out.append('\\n');
+        if (out.length() > 0) out.append('\n');
         out.append(line);
     }
 
