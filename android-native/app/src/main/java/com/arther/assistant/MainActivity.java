@@ -147,7 +147,8 @@ public class MainActivity extends BridgeActivity {
             String language = Locale.getDefault().getLanguage();
             if ("fr".equalsIgnoreCase(language)) return "fr-FR";
             if ("en".equalsIgnoreCase(language)) return "en-US";
-            return "ar-DZ";
+            // Use a widely supported Arabic locale; ar-DZ is not available in every recognition service.
+            return "ar-SA";
         }
 
         @JavascriptInterface
