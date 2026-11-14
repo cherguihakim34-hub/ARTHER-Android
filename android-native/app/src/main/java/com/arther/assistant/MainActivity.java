@@ -317,7 +317,8 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
-        Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener);\n        if (artherBridge != null) {
+        Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener);
+        if (artherBridge != null) {
             if (artherBridge.recognizer != null) artherBridge.recognizer.destroy();
             if (artherBridge.tts != null) artherBridge.tts.shutdown();
         }
