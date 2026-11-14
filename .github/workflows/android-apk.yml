@@ -53,6 +53,8 @@ jobs:
           dependency = '    implementation "dev.rikka.shizuku:api:13.1.5"\n'
           if dependency.strip() not in s:
               s = s.replace("dependencies {", "dependencies {\n" + dependency, 1)
+          # Shizuku API 13.1.5 requires Android API 24 or newer.
+          s = s.replace("minSdkVersion rootProject.ext.minSdkVersion", "minSdkVersion 24")
           p.write_text(s)
           PY
 
