@@ -340,7 +340,10 @@ function executeLocalCommand(prompt) {
 async function runArther() {
   const prompt = question.value.trim();
   if (!prompt || busy) return;
-  if (executeLocalCommand(prompt)) return;
+  if (executeLocalCommand(prompt)) {
+    scheduleWakeListening(1600);
+    return;
+  }
 
   busy = true;
   if ($("run")) $("run").disabled = true;
@@ -375,11 +378,7 @@ async function runArther() {
   }
 }
 
-$("listen").addEventListener("click", () => {
-  wakeWordMode = false;
-  wakeArmed = false;
-  listen();
-});
+$("listen").addEventListener("click", startWakeWordMode);
 $("run").addEventListener("click", runArther);
 
 $("stopVoice").addEventListener("click", () => {
