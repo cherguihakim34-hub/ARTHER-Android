@@ -242,19 +242,19 @@ function executeLocalCommand(prompt) {
     return true;
   }
 
-  const clickMatch = text.match(/(?:اضغط على|انقر على|اختار|اختر|click|appuie sur|clique sur|selectionne)\\s+(.+)/);
+  const clickMatch = text.match(/(?:اضغط على|انقر على|اختار|اختر|click|appuie sur|clique sur|selectionne)\s+(.+)/);
   if (clickMatch) {
     nativeAction("CLICK_TEXT:" + clickMatch[1].trim());
     return true;
   }
 
-  const longClickMatch = text.match(/(?:اضغط مطولا على|ضغط مطول على|long press|appui long sur|appuie longuement sur)\\s+(.+)/);
+  const longClickMatch = text.match(/(?:اضغط مطولا على|ضغط مطول على|long press|appui long sur|appuie longuement sur)\s+(.+)/);
   if (longClickMatch) {
     nativeAction("LONG_CLICK_TEXT:" + longClickMatch[1].trim());
     return true;
   }
 
-  const typeMatch = text.match(/(?:اكتب|اكتب النص|اكتب له|type|ecris|ecrire|tape)\\s+(.+)/);
+  const typeMatch = text.match(/(?:اكتب|اكتب النص|اكتب له|type|ecris|ecrire|tape)\s+(.+)/);
   if (typeMatch) {
     if (window.ArtherNative?.typeText) {
       show("جارٍ إدخال النص في الحقل المحدد...");
