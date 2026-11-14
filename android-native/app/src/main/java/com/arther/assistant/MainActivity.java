@@ -76,6 +76,35 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public void shizukuStatus() {
+            boolean running = Shizuku.pingBinder();
+            boolean granted = running && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
+            reportShizuku(granted, !running ? "Shizuku غير مشغّل" :
+                (granted ? "Shizuku متصل ومصرّح" : "Shizuku يعمل، بانتظار منح الصلاحية"));
+        }
+
+        @JavascriptInterface
+        public void requestShizukuPermission() {
+            activity.runOnUiThread(() -> {
+                if (!Shizuku.pingBinder()) {
+                    reportShizuku(false, "شغّل Shizuku أولاً");
+                } else if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+                    reportShizuku(true, "ARTHER لديه صلاحية Shizuku");
+                } else {
+                    Shizuku.requestPermission(SHIZUKU_REQUEST_CODE);
+                }
+            });
+        }
+
+        void reportShizuku(boolean granted, String message) {
+            String safe = JSONObject.quote(message);
+            webView.post(() -> webView.evaluateJavascript(
+                "if(window.ArtherShizukuResult){window.ArtherShizukuResult(" + granted + "," + safe + ");}",
+                null
+            ));
+        }
+
+        @JavascriptInterface
         public void startListening() {
             activity.runOnUiThread(() -> {
                 if (activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
