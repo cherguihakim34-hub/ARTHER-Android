@@ -14,15 +14,84 @@ import java.util.Locale;
 public class ArtherAccessibilityService extends AccessibilityService {
 
     private static ArtherAccessibilityService instance;
+    private volatile String cachedScreenText = "";
+    private volatile String cachedPackageName = "";
+    private long lastSnapshotAt = 0L;
 
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
         instance = this;
+        refreshScreenSnapshot();
     }
 
     @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {}
+    public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (event == null) return;
+        int type = event.getEventType();
+        if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
+            type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
+            type == AccessibilityEvent.TYPE_VIEW_SCROLLED ||
+            type == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            long now = android.os.SystemClock.uptimeMillis();
+            if (now - lastSnapshotAt >= 250L) {
+                lastSnapshotAt = now;
+                refreshScreenSnapshot();
+            }
+        }
+    }
+
+    private void refreshScreenSnapshot() {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null) {
+            cachedScreenText = "";
+            return;
+        }
+        StringBuilder out = new StringBuilder();
+        appendVisibleText(root, out, 0, new int[]{0});
+        cachedScreenText = out.toString().trim();
+        CharSequence pkg = root.getPackageName();
+        cachedPackageName = pkg == null ? "" : pkg.toString();
+    }
+
+    private void appendVisibleText(
+        AccessibilityNodeInfo node,
+        StringBuilder out,
+        int depth,
+        int[] count
+    ) {
+        if (node == null || depth > 18 || count[0] >= 140 || out.length() >= 6000) return;
+        count[0]++;
+        if (!node.isPassword()) {
+            CharSequence text = node.getText();
+            CharSequence desc = node.getContentDescription();
+            appendUniqueLine(out, text);
+            if (desc != null && (text == null || !desc.toString().contentEquals(text)))
+                appendUniqueLine(out, desc);
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            if (count[0] >= 140 || out.length() >= 6000) break;
+            appendVisibleText(node.getChild(i), out, depth + 1, count);
+        }
+    }
+
+    private void appendUniqueLine(StringBuilder out, CharSequence value) {
+        if (value == null) return;
+        String line = value.toString().replaceAll("\\s+", " ").trim();
+        if (line.isEmpty() || out.indexOf(line) >= 0) return;
+        if (out.length() > 0) out.append('\\n');
+        out.append(line);
+    }
+
+    public static String getCachedScreenText() {
+        ArtherAccessibilityService service = instance;
+        return service == null ? "" : service.cachedScreenText;
+    }
+
+    public static String getCachedPackageName() {
+        ArtherAccessibilityService service = instance;
+        return service == null ? "" : service.cachedPackageName;
+    }
 
     @Override
     public void onInterrupt() {}
