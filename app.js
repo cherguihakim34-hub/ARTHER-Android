@@ -362,7 +362,7 @@ function extractAppName(prompt) {
 
 function isDeviceInfoRequest(prompt) {
   const t = normalizeCommand(prompt);
-  return /(معلومات|مواصفات|بيانات).*(هاتفي|الهاتف|الجهاز|تليفوني|تلفوني)|(هاتفي|الهاتف|الجهاز|تليفوني|تلفوني).*(معلومات|مواصفات|نوع|طراز)|(ما نوع|ما طراز|ما موديل|وش نوع|واش نوع|شنو نوع).*(هاتفي|الهاتف|جهازي|تليفوني)|device info|phone info|about this phone|informations du telephone|modele du telephone/.test(t);
+  return /(معلومات|مواصفات|بيانات).*(هاتفي|الهاتف|الجهاز|تليفوني|تلفوني)|(هاتفي|الهاتف|الجهاز|تليفوني|تلفوني).*(معلومات|مواصفات|نوع|طراز)|(ما نوع|ما طراز|ما موديل|وش نوع|واش نوع|شنو نوع).*(هاتفي|الهاتف|جهازي|تليفوني)|البطاريه|نسبه الشحن|كم شحن|battery|niveau batterie|device info|phone info|about this phone|informations du telephone|modele du telephone/.test(t);
 }
 
 function executeLocalCommand(prompt) {
@@ -653,6 +653,11 @@ if ($("openCamera")) $("openCamera").addEventListener("click", () => window.Arth
 if ($("openWifi")) $("openWifi").addEventListener("click", () => window.ArtherNative?.openSettings?.("wifi"));
 if ($("openMap")) $("openMap").addEventListener("click", () => window.ArtherNative?.openMap?.("موقعي الحالي"));
 if ($("openAlarms")) $("openAlarms").addEventListener("click", () => window.ArtherNative?.showAlarms?.());
+if ($("quickScreenshot")) $("quickScreenshot").addEventListener("click", () => nativeAction("TAKE_SCREENSHOT"));
+if ($("quickNotifications")) $("quickNotifications").addEventListener("click", () => nativeAction("NOTIFICATIONS"));
+if ($("quickLock")) $("quickLock").addEventListener("click", () => nativeAction("LOCK_SCREEN"));
+if ($("quickVolumeUp")) $("quickVolumeUp").addEventListener("click", () => window.ArtherNative?.controlVolume?.("UP"));
+if ($("quickVolumeDown")) $("quickVolumeDown").addEventListener("click", () => window.ArtherNative?.controlVolume?.("DOWN"));
 if ($("requestBrightness")) $("requestBrightness").addEventListener("click", () => window.ArtherNative?.requestBrightnessPermission?.());
 
 if ($("requestMic")) $("requestMic").addEventListener("click", () => {
