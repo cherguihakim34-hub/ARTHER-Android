@@ -169,8 +169,35 @@ public class MainActivity extends BridgeActivity {
                     sendStatus("التعرف على الصوت غير متاح");
                     return;
                 }
-                if (recognizer != null) recognizer.destroy();
-                recognizer = SpeechRecognizer.createSpeechRecognizer(activity);
+                // Recreate a clean recognizer instance for each listening session.
+                if (recognizer != null) {
+                    try { recognizer.cancel(); } catch (Exception ignored) {}
+                    try { recognizer.destroy(); } catch (Exception ignored) {}
+                    recognizer = null;
+                }
+
+                // Prefer Google's installed recognition service when available, then use
+                // Android's configured default provider as a fallback.
+                android.content.ComponentName selectedService = null;
+                Intent serviceQuery = new Intent(android.speech.RecognitionService.SERVICE_INTERFACE);
+                List<ResolveInfo> recognitionServices = activity.getPackageManager()
+                    .queryIntentServices(serviceQuery, PackageManager.MATCH_ALL);
+                for (ResolveInfo info : recognitionServices) {
+                    if (info.serviceInfo != null &&
+                        "com.google.android.googlequicksearchbox".equals(info.serviceInfo.packageName)) {
+                        selectedService = new android.content.ComponentName(
+                            info.serviceInfo.packageName, info.serviceInfo.name);
+                        break;
+                    }
+                }
+                try {
+                    recognizer = selectedService != null
+                        ? SpeechRecognizer.createSpeechRecognizer(activity, selectedService)
+                        : SpeechRecognizer.createSpeechRecognizer(activity);
+                } catch (Exception providerError) {
+                    recognizer = SpeechRecognizer.createSpeechRecognizer(activity);
+                }
+
                 recognizer.setRecognitionListener(new RecognitionListener() {
                     @Override public void onReadyForSpeech(Bundle params) { sendStatus("أنا أستمع إليك..."); }
                     @Override public void onBeginningOfSpeech() {}
@@ -233,8 +260,17 @@ public class MainActivity extends BridgeActivity {
                 Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
                 intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
                 intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, preferredLanguageTag());
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, preferredLanguageTag());
                 intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-                recognizer.startListening(intent);
+                intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+                intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, activity.getPackageName());
+                try {
+                    recognizer.startListening(intent);
+                } catch (Exception startError) {
+                    sendStatus("تعذر تشغيل خدمة التعرف على الصوت: " + startError.getClass().getSimpleName());
+                    try { recognizer.destroy(); } catch (Exception ignored) {}
+                    recognizer = null;
+                }
             });
         }
 
