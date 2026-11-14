@@ -1,4 +1,3 @@
-
 "use strict";
 
 const API = "https://arther-api.onrender.com";
@@ -22,7 +21,6 @@ function speak(message) {
     window.ArtherNative.speak(String(message));
     return;
   }
-
   if ("speechSynthesis" in window) {
     speechSynthesis.cancel();
     const msg = new SpeechSynthesisUtterance(String(message));
@@ -38,30 +36,21 @@ function listen() {
     window.ArtherNative.startListening();
     return;
   }
-
-  const Recognition =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
-
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) {
     show("التعرف على الصوت يحتاج إلى نسخة Android الأصلية.");
     return;
   }
-
   const rec = new Recognition();
   rec.lang = "ar-DZ";
   rec.interimResults = false;
   rec.maxAlternatives = 1;
-
   rec.onresult = event => {
     question.value = event.results[0][0].transcript;
     voiceStatus.textContent = "تم استقبال الأمر";
     runArther();
   };
-
-  rec.onerror = () => {
-    voiceStatus.textContent = "تعذر التعرف على الصوت";
-  };
-
+  rec.onerror = () => voiceStatus.textContent = "تعذر التعرف على الصوت";
   rec.start();
 }
 
@@ -76,91 +65,98 @@ window.ArtherFlashResult = function(success, message) {
   speak(message);
 };
 
+window.ArtherAppResult = function(success, message) {
+  show(message);
+  speak(message);
+};
+
 function normalizeCommand(value) {
   return String(value || "")
     .toLowerCase()
-    .replace(/[أإآ]/g, "ا")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/[ى]/g, "ي")
+    .replace(/[ؤ]/g, "و")
+    .replace(/[ئ]/g, "ي")
     .replace(/[ًٌٍَُِّْـ]/g, "")
-    .replace(/[؟?!.,،]/g, " ")
+    .replace(/[؟?!.,،؛:()[\]{}"'`]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function nativeAction(action) {
   if (!window.ArtherNative?.performAction) {
-    show("التحكم يحتاج إلى نسخة Android الأصلية وتفعيل خدمة إمكانية الوصول.");
+    show("هذا الأمر يحتاج إلى نسخة Android الأصلية وتفعيل خدمة إمكانية الوصول.");
+    speak("هذا الأمر يحتاج إلى تفعيل خدمة إمكانية الوصول.");
     return false;
   }
-
   window.ArtherNative.performAction(action);
   return true;
 }
 
 function detectFlashCommand(prompt) {
-  const text = normalizeCommand(prompt);
+  const t = normalizeCommand(prompt);
+  const hasFlash = /\b(flash|torch|torche|lampe)\b/.test(t) ||
+    /(فلاش|مصباح|كشاف|ضوء|ضو الهاتف|ضو التليفون)/.test(t);
+  if (!hasFlash) return null;
 
-  const target =
-    "(?:الفلاش|فلاش|المصباح|الكشاف|ضوء الهاتف|ضو الهاتف|flash|torch|torche)";
+  const off = /(اطف|اطفاء|اغلق|سكر|طفي|طف|وقف|حبس|نحي|طفّي|off|disable|eteins|eteindre|desactive|desactiver)/.test(t);
+  const on = /(شغل|تشغيل|افتح|فتح|ولع|اضئ|انر|شعل|ضوي|خدم|اشعل|on|enable|turn on|allume|activer|active)/.test(t);
 
-  const on = new RegExp(
-    "(?:شغل|تشغيل|افتح|فتح|ولع|اضئ|انر|شعل|اشعل|قم بتشغيل|turn on|enable|allume|active).*" +
-    target +
-    "|" + target +
-    ".*(?:شغل|تشغيل|افتح|ولع|اضئ|انر|شعل|on|allume)",
-    "i"
-  );
-
-  const off = new RegExp(
-    "(?:اطف|اطفاء|اغلق|سكر|طفي|قم باطفاء|turn off|disable|eteins|desactive).*" +
-    target +
-    "|" + target +
-    ".*(?:اطف|اغلق|سكر|طفي|off|eteins)",
-    "i"
-  );
-
-  if (on.test(text)) return "ON";
-  if (off.test(text)) return "OFF";
-
-  if (
-    lastFlashOn &&
-    /^(اطفئه|اطفيه|طفيه|اغلقه|سكره|اطف|طفي|طف|off)$/.test(text)
-  ) {
-    return "OFF";
-  }
-
+  if (off && !on) return "OFF";
+  if (on && !off) return "ON";
+  if (/(اطف|طفي|طف|اغلق|سكر|off)/.test(t)) return "OFF";
+  if (/(شغل|افتح|ولع|شعل|on|allume)/.test(t)) return "ON";
   return null;
+}
+
+function extractAppName(prompt) {
+  let t = normalizeCommand(prompt);
+  const openIntent = /(افتح|فتح|شغل|تشغيل|ابدأ|روح ل|اذهب الى|انتقل الى|launch|open|start|ouvre|ouvrir|lance|demarre)/;
+  if (!openIntent.test(t)) return null;
+
+  t = t.replace(/^(من فضلك|لو سمحت|يا ارثر|ارثر)\s+/, "");
+  t = t.replace(/(من فضلك|لو سمحت|يا ارثر|ارثر)/g, " ");
+  t = t.replace(/^(من فضلك )?(افتح|فتح|شغل|تشغيل|ابدأ|روح ل|اذهب الى|انتقل الى|launch|open|start|ouvre|ouvrir|lance|demarre)\s+/, "");
+  t = t.replace(/^(لي|ليّا|ليها|من فضلك)\s+/, "");
+  t = t.replace(/\s+(من فضلك|لو سمحت|يا ارثر|ارثر)$/, "");
+  t = t.replace(/^(التطبيق|برنامج)\s+/, "");
+  return t.trim() || null;
 }
 
 function executeLocalCommand(prompt) {
   const text = normalizeCommand(prompt);
 
-  // الفلاش
   const flash = detectFlashCommand(prompt);
-
   if (flash) {
     if (!window.ArtherNative?.setFlash) {
       show("التحكم بالفلاش غير متاح في هذه النسخة.");
       speak("التحكم بالفلاش غير متاح.");
       return true;
     }
-
     lastFlashOn = flash === "ON";
-    show(flash === "ON" ? "تشغيل الفلاش..." : "إطفاء الفلاش...");
+    show(flash === "ON" ? "جار تشغيل الفلاش..." : "جار إطفاء الفلاش...");
     window.ArtherNative.setFlash(flash);
     return true;
   }
 
-  // التنقل في الهاتف
+  if (lastFlashOn && /^(اطفئه|اطفيه|طفيه|اغلقه|سكره|اطف|طفي|طف|off)$/.test(text)) {
+    window.ArtherNative?.setFlash?.("OFF");
+    lastFlashOn = false;
+    return true;
+  }
+
   const navigation = [
-    [/^(الرئيسية|اذهب للرئيسية|الشاشة الرئيسية|home)$/, "HOME"],
-    [/^(رجوع|ارجع|الى الخلف|back)$/, "BACK"],
-    [/^(التطبيقات المفتوحة|التطبيقات الاخيرة|اخر التطبيقات|recent apps)$/, "RECENTS"],
-    [/^(افتح الاشعارات|اظهر الاشعارات|شريط الاشعارات)$/, "NOTIFICATIONS"],
-    [/^(الاعدادات السريعة|لوحة الاختصارات|quick settings)$/, "QUICK_SETTINGS"],
-    [/^(اقفل الهاتف|اقفل الشاشة|قفل الشاشة|lock screen)$/, "LOCK_SCREEN"],
-    [/^(التقط صورة للشاشة|لقطة شاشة|سكرين شوت|screenshot)$/, "TAKE_SCREENSHOT"],
-    [/^(انزل|مرر للاسفل|انزل الصفحة|scroll down)$/, "SCROLL_DOWN"],
-    [/^(اصعد|مرر للاعلى|اصعد الصفحة|scroll up)$/, "SCROLL_UP"]
+    [/(الرئيسيه|اذهب للرئيسيه|الشاشه الرئيسيه|home)$/, "HOME"],
+    [/(رجوع|ارجع|الى الخلف|back)$/, "BACK"],
+    [/(التطبيقات المفتوحه|التطبيقات الاخيره|اخر التطبيقات|recent apps)$/, "RECENTS"],
+    [/(افتح الاشعارات|اظهر الاشعارات|شريط الاشعارات|notifications)$/, "NOTIFICATIONS"],
+    [/(الاعدادات السريعه|لوحه الاختصارات|quick settings)$/, "QUICK_SETTINGS"],
+    [/(اقفل الهاتف|اقفل الشاشه|قفل الشاشه|lock screen)$/, "LOCK_SCREEN"],
+    [/(التقط صوره للشاشه|لقطه شاشه|سكرين شوت|screenshot)$/, "TAKE_SCREENSHOT"],
+    [/(انزل|مرر للاسفل|انزل الصفحه|scroll down)$/, "SCROLL_DOWN"],
+    [/(اصعد|مرر للاعلى|اصعد الصفحه|scroll up)$/, "SCROLL_UP"]
   ];
 
   for (const [pattern, action] of navigation) {
@@ -170,59 +166,35 @@ function executeLocalCommand(prompt) {
     }
   }
 
-  // فتح تطبيق
-  const openMatch = text.match(
-    /^(?:افتح|شغل|ابدأ|launch|open)\s+(.+)$/
-  );
-
-  if (openMatch) {
-    const appName = openMatch[1].trim();
-
+  const appName = extractAppName(prompt);
+  if (appName) {
     if (window.ArtherNative?.openApp) {
+      show("أبحث عن التطبيق: " + appName);
       window.ArtherNative.openApp(appName);
-      show("جارٍ فتح " + appName);
     } else {
       show("فتح التطبيقات غير متاح في هذه النسخة.");
     }
-
     return true;
   }
 
-  // الضغط على عنصر ظاهر بالاسم
-  const clickMatch = text.match(
-    /^(?:اضغط على|انقر على|اختار|اختر|click)\s+(.+)$/
-  );
-
+  const clickMatch = text.match(/(?:اضغط على|انقر على|اختار|اختر|click)\s+(.+)/);
   if (clickMatch) {
     nativeAction("CLICK_TEXT:" + clickMatch[1].trim());
     return true;
   }
 
-  // الضغط المطول
-  const longClickMatch = text.match(
-    /^(?:اضغط مطولا على|ضغط مطول على|long press)\s+(.+)$/
-  );
-
+  const longClickMatch = text.match(/(?:اضغط مطولا على|ضغط مطول على|long press)\s+(.+)/);
   if (longClickMatch) {
     nativeAction("LONG_CLICK_TEXT:" + longClickMatch[1].trim());
     return true;
   }
 
-  // الكتابة في الحقل المحدد
-  const typeMatch = text.match(
-    /^(?:اكتب|اكتب النص|اكتب له|type)\s+(.+)$/
-  );
-
+  const typeMatch = text.match(/(?:اكتب|اكتب النص|اكتب له|type)\s+(.+)/);
   if (typeMatch) {
-    const value = typeMatch[1].trim();
-
     if (window.ArtherNative?.typeText) {
-      window.ArtherNative.typeText(value);
+      window.ArtherNative.typeText(typeMatch[1].trim());
       show("تم إرسال النص إلى حقل الكتابة المحدد.");
-    } else {
-      show("خدمة الكتابة غير متاحة. فعّل خدمة إمكانية الوصول.");
-    }
-
+    } else show("خدمة الكتابة غير متاحة. فعّل خدمة إمكانية الوصول.");
     return true;
   }
 
@@ -231,22 +203,17 @@ function executeLocalCommand(prompt) {
 
 async function runArther() {
   const prompt = question.value.trim();
-
   if (!prompt || busy) return;
-
   if (executeLocalCommand(prompt)) return;
 
   busy = true;
-
   if ($("run")) $("run").disabled = true;
   connection.textContent = "ARTHER يعالج طلبك...";
 
   try {
     const response = await fetch(API + "/api/agent", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
         prompt,
         language: "auto",
@@ -255,13 +222,9 @@ async function runArther() {
     });
 
     const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.detail || "فشل الاتصال بالخادم");
-    }
+    if (!response.ok) throw new Error(data.detail || "فشل الاتصال بالخادم");
 
     const answer = data.answer || "لم يصل رد من الخادم.";
-
     show(answer);
     connection.textContent = "متصل";
     speak(answer);
@@ -280,30 +243,20 @@ $("listen").addEventListener("click", listen);
 $("run").addEventListener("click", runArther);
 
 $("stopVoice").addEventListener("click", () => {
-  if (window.ArtherNative?.stopSpeaking) {
-    window.ArtherNative.stopSpeaking();
-  }
-
-  if ("speechSynthesis" in window) {
-    speechSynthesis.cancel();
-  }
+  window.ArtherNative?.stopSpeaking?.();
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
 });
 
 $("home").addEventListener("click", () => nativeAction("HOME"));
 $("back").addEventListener("click", () => nativeAction("BACK"));
-
-$("scrollDown").addEventListener("click", () =>
-  nativeAction("SCROLL_DOWN")
-);
+$("scrollDown").addEventListener("click", () => nativeAction("SCROLL_DOWN"));
 
 async function checkConnection() {
   try {
     const response = await fetch(API + "/health");
-
     if (!response.ok) throw new Error("offline");
 
     const health = await response.json();
-
     connection.textContent = health.ai_configured
       ? "ARTHER متصل"
       : "الخادم متصل والذكاء غير مضبوط";
