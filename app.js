@@ -1,5 +1,5 @@
 "use strict";
-// Build sync: speech recognizer provider recovery update.
+// Build sync: include speech recognition service visibility manifest fix.
 
 const API = "https://arther-api.onrender.com";
 const $ = id => document.getElementById(id);
