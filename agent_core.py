@@ -30,7 +30,6 @@ MODEL = os.getenv(
 )
 
 API_KEY = os.getenv("AI_API_KEY", "")
-
 GITHUB_API = "https://api.github.com"
 
 GITHUB_REPOSITORY = os.getenv(
@@ -88,6 +87,7 @@ Capabilities:
 - Select available tools.
 - Read GitHub repository files.
 - List repository files recursively.
+- Search GitHub filenames and file contents.
 - Read and write files in the temporary workspace.
 - Search and save permanent memories.
 - Analyze tool results.
@@ -107,6 +107,7 @@ Rules:
 12. Prefer multiple independent tool calls in one round.
 13. Keep tool calls efficient.
 14. If a tool fails, explain the actual error.
+15. Use search_repo_files to search repository code when needed.
 
 Reply in the user's language.
 Be direct, accurate and practical.
@@ -750,6 +751,109 @@ async def read_repo_file(path):
 
 
 # ============================================================
+# GITHUB REPOSITORY SEARCH
+# ============================================================
+
+async def search_repo_files(
+    query,
+    path="",
+    search_content=True,
+    max_results=20
+):
+    query = str(query or "").strip().lower()
+
+    if not query:
+        return {
+            "ok": False,
+            "error": "Search query is required."
+        }
+
+    try:
+        prefix = safe_repo_path(path)
+
+        tree_result = await list_repo_files(prefix)
+
+        if not tree_result.get("ok"):
+            return tree_result
+
+        matches = []
+        scanned = 0
+
+        max_results = max(
+            1,
+            min(int(max_results), 50)
+        )
+
+        searchable_extensions = {
+            ".py", ".js", ".ts", ".html", ".css",
+            ".json", ".xml", ".md", ".txt", ".yml",
+            ".yaml", ".java", ".kt", ".gradle"
+        }
+
+        for item in tree_result.get("items", []):
+            if item.get("type") != "file":
+                continue
+
+            file_path = item.get("path", "")
+            filename = file_path.rsplit("/", 1)[-1]
+
+            if query in file_path.lower():
+                matches.append({
+                    "path": file_path,
+                    "match_type": "filename",
+                    "preview": filename
+                })
+
+            elif search_content and scanned < 80:
+                extension = Path(filename).suffix.lower()
+
+                if extension not in searchable_extensions:
+                    continue
+
+                scanned += 1
+
+                result = await read_repo_file(file_path)
+
+                if not result.get("ok"):
+                    continue
+
+                content = result.get("content", "")
+                position = content.lower().find(query)
+
+                if position >= 0:
+                    start = max(0, position - 150)
+                    end = min(
+                        len(content),
+                        position + len(query) + 250
+                    )
+
+                    matches.append({
+                        "path": file_path,
+                        "match_type": "content",
+                        "preview": content[start:end]
+                    })
+
+            if len(matches) >= max_results:
+                break
+
+        return {
+            "ok": True,
+            "repository": GITHUB_REPOSITORY,
+            "branch": GITHUB_BRANCH,
+            "query": query,
+            "count": len(matches),
+            "scanned_files": scanned,
+            "items": matches
+        }
+
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc)[:500]
+        }
+
+
+# ============================================================
 # TOOL DEFINITIONS
 # ============================================================
 
@@ -819,6 +923,18 @@ TOOLS = [
     ),
 
     tool_definition(
+        "search_repo_files",
+        "Search GitHub repository filenames and file contents. Read-only.",
+        {
+            "query": {"type": "string"},
+            "path": {"type": "string"},
+            "search_content": {"type": "boolean"},
+            "max_results": {"type": "integer"}
+        },
+        ["query"]
+    ),
+
+    tool_definition(
         "save_memory",
         "Save a fact to permanent PostgreSQL memory.",
         {
@@ -864,6 +980,9 @@ async def call_tool(name, arguments):
 
     if name == "read_repo_file":
         return await read_repo_file(**arguments)
+
+    if name == "search_repo_files":
+        return await search_repo_files(**arguments)
 
     if name == "save_memory":
         return await save_memory(**arguments)
@@ -949,7 +1068,6 @@ async def ask_agent(client, messages):
 
 # ============================================================
 # LOCAL PLAN
-# No separate AI request is used here.
 # ============================================================
 
 def create_local_plan(prompt):
@@ -970,6 +1088,7 @@ def create_local_plan(prompt):
                     "write_file",
                     "list_repo_files",
                     "read_repo_file",
+                    "search_repo_files",
                     "save_memory",
                     "search_memories"
                 ]
@@ -980,7 +1099,6 @@ def create_local_plan(prompt):
 
 # ============================================================
 # PROGRAMMATIC VERIFICATION
-# No separate AI request is used here.
 # ============================================================
 
 def verify_execution(tool_log):
@@ -1240,7 +1358,6 @@ async def run_agent(
 
     # --------------------------------------------------------
     # LOCAL PLAN
-    # No planner API request.
     # --------------------------------------------------------
 
     plan = create_local_plan(prompt)
@@ -1330,7 +1447,6 @@ async def run_agent(
                     break
 
                 function = call.get("function", {})
-
                 name = function.get("name", "")
 
                 raw_arguments = (
