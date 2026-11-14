@@ -131,6 +131,19 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public String getScreenText() {
+            try {
+                JSONObject result = new JSONObject();
+                result.put("available", ArtherAccessibilityService.isEnabled());
+                result.put("package", ArtherAccessibilityService.getCachedPackageName());
+                result.put("text", ArtherAccessibilityService.getCachedScreenText());
+                return result.toString();
+            } catch (Exception e) {
+                return "{\\"available\\":false,\\"text\\":\\"تعذر قراءة الشاشة\\"}";
+            }
+        }
+
+        @JavascriptInterface
         public void startListening() {
             activity.runOnUiThread(() -> {
                 if (activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
