@@ -46,6 +46,16 @@ jobs:
           npx cap add android
           npx cap sync android
 
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle")
+          s = p.read_text()
+          dependency = '    implementation "dev.rikka.shizuku:api:13.1.5"\n'
+          if dependency.strip() not in s:
+              s = s.replace("dependencies {", "dependencies {\n" + dependency, 1)
+          p.write_text(s)
+          PY
+
       - name: Install native files
         run: |
           mkdir -p android/app/src/main/java/com/arther/assistant
