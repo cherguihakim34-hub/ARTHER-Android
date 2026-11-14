@@ -4,12 +4,14 @@ package com.arther.assistant;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
-public class ArtherAccessibilityService extends AccessibilityService {
+import java.util.Locale;
 
+public class ArtherAccessibilityService extends AccessibilityService {
     private static ArtherAccessibilityService instance;
 
     @Override
@@ -26,43 +28,58 @@ public class ArtherAccessibilityService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
-        instance = null;
+        if (instance == this) instance = null;
         super.onDestroy();
     }
 
-    public static boolean perform(String command) {
-        if (instance == null || command == null) return false;
+    public static boolean isEnabled() {
+        return instance != null;
+    }
+
+    public static boolean perform(String raw) {
+        if (instance == null || raw == null) return false;
+        String command = raw.trim();
 
         try {
-            switch (command) {
+            switch (command.toUpperCase(Locale.ROOT)) {
                 case "HOME":
-                    return instance.performGlobalAction(
-                        GLOBAL_ACTION_HOME
-                    );
-
+                    return instance.performGlobalAction(GLOBAL_ACTION_HOME);
                 case "BACK":
-                    return instance.performGlobalAction(
-                        GLOBAL_ACTION_BACK
-                    );
-
+                    return instance.performGlobalAction(GLOBAL_ACTION_BACK);
+                case "RECENTS":
+                    return instance.performGlobalAction(GLOBAL_ACTION_RECENTS);
+                case "NOTIFICATIONS":
+                    return instance.performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS);
+                case "QUICK_SETTINGS":
+                    return instance.performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS);
+                case "POWER_DIALOG":
+                    return instance.performGlobalAction(GLOBAL_ACTION_POWER_DIALOG);
+                case "LOCK_SCREEN":
+                    return Build.VERSION.SDK_INT >= 28 &&
+                        instance.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN);
+                case "TAKE_SCREENSHOT":
+                    return Build.VERSION.SDK_INT >= 28 &&
+                        instance.performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT);
                 case "SCROLL_DOWN":
                     return instance.scroll(true);
-
                 case "SCROLL_UP":
                     return instance.scroll(false);
-
                 default:
-                    if (command.startsWith("TYPE:")) {
+                    if (command.startsWith("TYPE:"))
                         return instance.typeText(command.substring(5));
-                    }
-
-                    if (command.startsWith("CLICK_TEXT:")) {
-                        return instance.clickText(command.substring(11));
-                    }
-
+                    if (command.startsWith("CLICK_TEXT:"))
+                        return instance.findAndAct(command.substring(11), false);
+                    if (command.startsWith("LONG_CLICK_TEXT:"))
+                        return instance.findAndAct(command.substring(16), true);
+                    if (command.startsWith("TAP:"))
+                        return instance.tap(command.substring(4), false);
+                    if (command.startsWith("LONG_PRESS:"))
+                        return instance.tap(command.substring(11), true);
+                    if (command.startsWith("SWIPE:"))
+                        return instance.swipe(command.substring(6));
                     return false;
             }
-        } catch (Exception e) {
+        } catch (Exception ignored) {
             return false;
         }
     }
@@ -73,7 +90,6 @@ public class ArtherAccessibilityService extends AccessibilityService {
 
         AccessibilityNodeInfo focused =
             root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-
         if (focused == null) return false;
 
         Bundle args = new Bundle();
@@ -88,33 +104,52 @@ public class ArtherAccessibilityService extends AccessibilityService {
         );
     }
 
-    private boolean clickText(String text) {
+    private boolean findAndAct(String text, boolean longClick) {
         AccessibilityNodeInfo root = getRootInActiveWindow();
-        if (root == null) return false;
-
-        return clickMatchingNode(root, text);
+        return root != null &&
+            findAndActNode(root, text.toLowerCase(Locale.ROOT), longClick);
     }
 
-    private boolean clickMatchingNode(
+    private boolean findAndActNode(
         AccessibilityNodeInfo node,
-        String text
+        String wanted,
+        boolean longClick
     ) {
+        if (node == null) return false;
+
         CharSequence label = node.getText();
+        CharSequence description = node.getContentDescription();
 
-        if (label != null &&
-            label.toString().toLowerCase().contains(text.toLowerCase()) &&
-            node.isClickable()) {
+        String searchable =
+            (label == null ? "" : label.toString()) + " " +
+            (description == null ? "" : description.toString());
 
-            return node.performAction(
-                AccessibilityNodeInfo.ACTION_CLICK
-            );
+        if (searchable.toLowerCase(Locale.ROOT).contains(wanted)) {
+            int action = longClick
+                ? AccessibilityNodeInfo.ACTION_LONG_CLICK
+                : AccessibilityNodeInfo.ACTION_CLICK;
+
+            if (node.isClickable() ||
+                (longClick && node.isLongClickable())) {
+                if (node.performAction(action)) return true;
+            }
+
+            AccessibilityNodeInfo parent = node.getParent();
+
+            while (parent != null) {
+                if (parent.isClickable() ||
+                    (longClick && parent.isLongClickable())) {
+                    if (parent.performAction(action)) return true;
+                }
+                parent = parent.getParent();
+            }
         }
 
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
 
             if (child != null &&
-                clickMatchingNode(child, text)) {
+                findAndActNode(child, wanted, longClick)) {
                 return true;
             }
         }
@@ -122,29 +157,67 @@ public class ArtherAccessibilityService extends AccessibilityService {
         return false;
     }
 
-    private boolean scroll(boolean down) {
+    private boolean tap(String coordinates, boolean longPress) {
+        String[] parts = coordinates.split(",");
+        if (parts.length != 2) return false;
+
+        float x = Float.parseFloat(parts[0].trim());
+        float y = Float.parseFloat(parts[1].trim());
+
         Path path = new Path();
+        path.moveTo(x, y);
 
-        float x = getResources().getDisplayMetrics().widthPixels / 2f;
-        float height = getResources().getDisplayMetrics().heightPixels;
+        GestureDescription.StrokeDescription stroke =
+            new GestureDescription.StrokeDescription(
+                path, 0, longPress ? 850 : 90
+            );
 
-        if (down) {
-            path.moveTo(x, height * 0.78f);
-            path.lineTo(x, height * 0.28f);
-        } else {
-            path.moveTo(x, height * 0.28f);
-            path.lineTo(x, height * 0.78f);
-        }
+        return dispatchGesture(
+            new GestureDescription.Builder()
+                .addStroke(stroke)
+                .build(),
+            null,
+            null
+        );
+    }
+
+    // SWIPE:x1,y1,x2,y2[,duration_ms]
+    private boolean swipe(String coordinates) {
+        String[] p = coordinates.split(",");
+        if (p.length < 4) return false;
+
+        float x1 = Float.parseFloat(p[0].trim());
+        float y1 = Float.parseFloat(p[1].trim());
+        float x2 = Float.parseFloat(p[2].trim());
+        float y2 = Float.parseFloat(p[3].trim());
+
+        long duration = p.length > 4
+            ? Long.parseLong(p[4].trim())
+            : 350L;
+
+        Path path = new Path();
+        path.moveTo(x1, y1);
+        path.lineTo(x2, y2);
 
         GestureDescription gesture =
             new GestureDescription.Builder()
                 .addStroke(
                     new GestureDescription.StrokeDescription(
-                        path, 0, 450
+                        path, 0, Math.max(80L, duration)
                     )
                 )
                 .build();
 
         return dispatchGesture(gesture, null, null);
+    }
+
+    private boolean scroll(boolean down) {
+        float x = getResources().getDisplayMetrics().widthPixels / 2f;
+        float h = getResources().getDisplayMetrics().heightPixels;
+
+        return swipe(
+            x + "," + (down ? h * 0.78f : h * 0.28f) + "," +
+            x + "," + (down ? h * 0.28f : h * 0.78f) + ",450"
+        );
     }
 }
