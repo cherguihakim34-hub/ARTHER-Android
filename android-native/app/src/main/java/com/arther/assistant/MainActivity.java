@@ -105,6 +105,32 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public String getDeviceInfo() {
+            try {
+                android.content.Intent batteryIntent = activity.registerReceiver(
+                    null, new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED));
+                int level = -1;
+                if (batteryIntent != null) {
+                    int current = batteryIntent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
+                    int scale = batteryIntent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1);
+                    if (current >= 0 && scale > 0) level = Math.round(current * 100f / scale);
+                }
+                JSONObject info = new JSONObject();
+                info.put("manufacturer", android.os.Build.MANUFACTURER);
+                info.put("brand", android.os.Build.BRAND);
+                info.put("model", android.os.Build.MODEL);
+                info.put("device", android.os.Build.DEVICE);
+                info.put("android_version", android.os.Build.VERSION.RELEASE);
+                info.put("sdk", android.os.Build.VERSION.SDK_INT);
+                info.put("battery_percent", level);
+                info.put("language", Locale.getDefault().toLanguageTag());
+                return info.toString();
+            } catch (Exception e) {
+                return "{\\"error\\":\\"تعذر قراءة معلومات الجهاز\\"}";
+            }
+        }
+
+        @JavascriptInterface
         public void startListening() {
             activity.runOnUiThread(() -> {
                 if (activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
