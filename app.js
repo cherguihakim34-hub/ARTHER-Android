@@ -14,6 +14,7 @@ let wakeWordMode = true;
 let wakeArmed = false;
 let wakeRestartTimer = null;
 let wakeArmTimer = null;
+let wakeError11Count = 0;
 
 function scheduleWakeListening(delay = 500) {
   if (!wakeWordMode || document.hidden) return;
@@ -89,13 +90,32 @@ function listen() {
 }
 
 window.ArtherListeningStatus = function(message) {
-  voiceStatus.textContent = String(message || "");
-  if (wakeWordMode && /تعذر سماع الأمر/.test(String(message || ""))) {
-    scheduleWakeListening(1300);
+  const status = String(message || "");
+  voiceStatus.textContent = status;
+
+  if (/أنا أستمع إليك/.test(status)) {
+    wakeError11Count = 0;
+    return;
+  }
+
+  if (!wakeWordMode || !/تعذر سماع الأمر/.test(status)) return;
+
+  // Error 7 means no clear speech; error 11 means the recognition
+  // service disconnected. Retry with a bounded backoff for error 11.
+  if (/رمز 11/.test(status)) {
+    wakeError11Count = Math.min(wakeError11Count + 1, 4);
+    const delay = Math.min(12000, 2500 * Math.pow(2, wakeError11Count - 1));
+    voiceStatus.textContent = "انقطع محرك الصوت؛ سأعيد الاتصال تلقائياً...";
+    scheduleWakeListening(delay);
+  } else if (/رمز 7/.test(status)) {
+    scheduleWakeListening(1800);
+  } else {
+    scheduleWakeListening(2500);
   }
 };
 
 window.ArtherVoiceResult = function(text) {
+  wakeError11Count = 0;
   const spoken = String(text || "").trim();
   if (!spoken) {
     voiceStatus.textContent = "بانتظار كلمة آرثر...";
