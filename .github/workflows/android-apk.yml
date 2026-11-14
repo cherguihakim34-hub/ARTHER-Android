@@ -53,8 +53,28 @@ jobs:
 
           cp android-native/app/src/main/java/com/arther/assistant/MainActivity.java android/app/src/main/java/com/arther/assistant/
           cp android-native/app/src/main/java/com/arther/assistant/ArtherAccessibilityService.java android/app/src/main/java/com/arther/assistant/
-          cp android-native/app/src/main/res/xml/arther_accessibility.xml android/app/src/main/res/xml/
-          cp android-native/app/src/main/res/values/arther_strings.xml android/app/src/main/res/values/
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          files = [
+              (
+                  Path("android-native/app/src/main/res/xml/arther_accessibility.xml"),
+                  Path("android/app/src/main/res/xml/arther_accessibility.xml")
+              ),
+              (
+                  Path("android-native/app/src/main/res/values/arther_strings.xml"),
+                  Path("android/app/src/main/res/values/arther_strings.xml")
+              )
+          ]
+
+          for source, target in files:
+              content = source.read_text(encoding="utf-8-sig")
+              content = re.sub(r'^\s*<\?xml[^?]*\?>\s*', '', content)
+              content = '<?xml version="1.0" encoding="utf-8"?>\n' + content.lstrip()
+              target.write_text(content, encoding="utf-8")
+          PY
 
       - name: Configure permissions
         run: |
@@ -92,6 +112,21 @@ jobs:
               s = s.replace("</application>", service + "\n</application>")
 
           p.write_text(s)
+          PY
+
+      - name: Validate XML
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          for p in [
+              Path("android/app/src/main/res/xml/arther_accessibility.xml"),
+              Path("android/app/src/main/res/values/arther_strings.xml"),
+              Path("android/app/src/main/AndroidManifest.xml")
+          ]:
+              ET.parse(p)
+              print("OK:", p)
           PY
 
       - name: Build APK
