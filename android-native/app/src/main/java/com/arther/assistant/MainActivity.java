@@ -175,7 +175,46 @@ public class MainActivity extends BridgeActivity {
                     @Override public void onRmsChanged(float value) {}
                     @Override public void onBufferReceived(byte[] buffer) {}
                     @Override public void onEndOfSpeech() { sendStatus("أحلل كلامك..."); }
-                    @Override public void onError(int error) { sendStatus("تعذر سماع الأمر. حاول مجدداً."); }
+                    @Override public void onError(int error) {
+                        String reason;
+                        switch (error) {
+                            case SpeechRecognizer.ERROR_AUDIO:
+                                reason = "مشكلة في الميكروفون أو مسار الصوت";
+                                break;
+                            case SpeechRecognizer.ERROR_CLIENT:
+                                reason = "توقف محرك التعرف عن العمل";
+                                break;
+                            case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
+                                reason = "إذن الميكروفون غير ممنوح. اسمح لـ ARTHER باستخدام الميكروفون";
+                                break;
+                            case SpeechRecognizer.ERROR_NETWORK:
+                                reason = "تعذر الاتصال بخدمة التعرف على الصوت. تحقق من الإنترنت";
+                                break;
+                            case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
+                                reason = "انتهت مهلة الاتصال بخدمة التعرف على الصوت";
+                                break;
+                            case SpeechRecognizer.ERROR_NO_MATCH:
+                                reason = "لم أتعرف على كلمات واضحة. اقترب من الميكروفون وتكلم بوضوح";
+                                break;
+                            case SpeechRecognizer.ERROR_RECOGNIZER_BUSY:
+                                reason = "الميكروفون مشغول بتطبيق آخر. أغلق التطبيق الذي يستخدمه";
+                                break;
+                            case SpeechRecognizer.ERROR_SERVER:
+                                reason = "خدمة التعرف على الصوت لا تستجيب حالياً";
+                                break;
+                            case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
+                                reason = "لم أسمع كلاماً. قل آرثر بعد بدء الاستماع مباشرة";
+                                break;
+                            case 12:
+                            case 13:
+                                reason = "لغة التعرف غير مدعومة أو غير محمّلة. تحقق من لغات تطبيق Google أو جرّب الفرنسية";
+                                break;
+                            default:
+                                reason = "خطأ غير معروف في التعرف على الصوت";
+                                break;
+                        }
+                        sendStatus("تعذر سماع الأمر: " + reason + " (رمز " + error + ")");
+                    }
                     @Override public void onResults(Bundle results) {
                         ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                         if (matches != null && !matches.isEmpty()) {
