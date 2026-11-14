@@ -88,6 +88,13 @@ function listen() {
   rec.start();
 }
 
+window.ArtherListeningStatus = function(message) {
+  voiceStatus.textContent = String(message || "");
+  if (wakeWordMode && /تعذر سماع الأمر/.test(String(message || ""))) {
+    scheduleWakeListening(1300);
+  }
+};
+
 window.ArtherVoiceResult = function(text) {
   const spoken = String(text || "").trim();
   if (!spoken) {
