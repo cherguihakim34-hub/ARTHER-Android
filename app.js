@@ -96,9 +96,15 @@ function nativeAction(action) {
     speak("هذا الأمر يحتاج إلى تفعيل خدمة إمكانية الوصول.");
     return false;
   }
+  show("جارٍ إرسال الأمر إلى Android...");
   window.ArtherNative.performAction(action);
   return true;
 }
+
+window.ArtherActionResult = function(accepted, message) {
+  show(message || (accepted ? "قبل Android الأمر؛ تحقق من نتيجة الحركة على الشاشة." : "لم يقبل Android الأمر."));
+  if (!accepted && message) speak(message);
+};
 
 function detectFlashCommand(prompt) {
   const t = normalizeCommand(prompt);
