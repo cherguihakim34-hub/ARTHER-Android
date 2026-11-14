@@ -1,4 +1,3 @@
-
 "use strict";
 
 const API = "https://arther-api.onrender.com";
@@ -61,11 +60,6 @@ function listen() {
     voiceStatus.textContent = "تعذر التعرف على الصوت";
   };
 
-  rec.onend = () => {
-    if (voiceStatus.textContent === "ARTHER يستمع إليك...")
-      voiceStatus.textContent = "انتهى الاستماع";
-  };
-
   rec.start();
 }
 
@@ -75,18 +69,77 @@ window.ArtherVoiceResult = function(text) {
   if (text) runArther();
 };
 
+window.ArtherFlashResult = function(success, message) {
+  show(message);
+  speak(message);
+};
+
+function normalizeCommand(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/[ًٌٍَُِّْـ]/g, "")
+    .trim();
+}
+
+function detectFlashCommand(prompt) {
+  const text = normalizeCommand(prompt);
+
+  const target = "(?:الفلاش|فلاش|المصباح|الكشاف|flash|torch|torche)";
+
+  const on = new RegExp(
+    "(?:شغل|شغّل|افتح|ولع|اضئ|انر|شعل|turn on|enable|allume|active).*" +
+    target +
+    "|" + target +
+    ".*(?:شغل|افتح|ولع|اضئ|انر|شعل|on|allume)",
+    "i"
+  );
+
+  const off = new RegExp(
+    "(?:اطف|اغلق|سكر|طفي|طفّي|turn off|disable|eteins|desactive).*" +
+    target +
+    "|" + target +
+    ".*(?:اطف|اغلق|سكر|طفي|off|eteins)",
+    "i"
+  );
+
+  if (on.test(text)) return "ON";
+  if (off.test(text)) return "OFF";
+
+  return null;
+}
+
 async function runArther() {
   const prompt = question.value.trim();
+
   if (!prompt || busy) return;
 
+  // تنفيذ أوامر الفلاش محلياً على الهاتف
+  const flashCommand = detectFlashCommand(prompt);
+
+  if (flashCommand) {
+    if (!window.ArtherNative?.setFlash) {
+      show("التحكم بالفلاش غير متاح في هذه النسخة.");
+      return;
+    }
+
+    show("جارٍ تنفيذ أمر الفلاش...");
+
+    window.ArtherNative.setFlash(flashCommand);
+    return;
+  }
+
+  // بقية الأوامر والأسئلة ترسل إلى الخادم
   busy = true;
   $("run").disabled = true;
-  connection.textContent = "ARTHER ينفذ...";
+  connection.textContent = "ARTHER يعالج طلبك...";
 
   try {
     const response = await fetch(API + "/api/agent", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({
         prompt,
         language: "auto",
@@ -101,6 +154,7 @@ async function runArther() {
     }
 
     const answer = data.answer || "لم يصل رد من الخادم.";
+
     show(answer);
     connection.textContent = "متصل";
     speak(answer);
@@ -117,7 +171,7 @@ async function runArther() {
 
 function nativeAction(action) {
   if (!window.ArtherNative?.performAction) {
-    show("التحكم يحتاج إلى تفعيل خدمة إمكانية الوصول.");
+    show("التحكم يحتاج إلى نسخة Android الأصلية.");
     return;
   }
 
@@ -128,25 +182,31 @@ $("listen").addEventListener("click", listen);
 $("run").addEventListener("click", runArther);
 
 $("stopVoice").addEventListener("click", () => {
-  if (window.ArtherNative?.stopSpeaking)
+  if (window.ArtherNative?.stopSpeaking) {
     window.ArtherNative.stopSpeaking();
+  }
 
-  if ("speechSynthesis" in window)
+  if ("speechSynthesis" in window) {
     speechSynthesis.cancel();
+  }
 });
 
 $("home").addEventListener("click", () => nativeAction("HOME"));
 $("back").addEventListener("click", () => nativeAction("BACK"));
-$("scrollDown").addEventListener("click", () => nativeAction("SCROLL_DOWN"));
+
+$("scrollDown").addEventListener("click", () =>
+  nativeAction("SCROLL_DOWN")
+);
 
 async function checkConnection() {
   try {
-    const r = await fetch(API + "/health");
-    if (!r.ok) throw new Error("offline");
+    const response = await fetch(API + "/health");
 
-    const h = await r.json();
+    if (!response.ok) throw new Error("offline");
 
-    connection.textContent = h.ai_configured
+    const health = await response.json();
+
+    connection.textContent = health.ai_configured
       ? "ARTHER متصل"
       : "الخادم متصل والذكاء غير مضبوط";
 
