@@ -302,6 +302,8 @@ function normalizeCommand(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[أإآٱ]/g, "ا")
+    .replace(/[٠-٩]/g, d => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/[۰-۹]/g, d => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
     .replace(/[ى]/g, "ي")
     .replace(/[ؤ]/g, "و")
     .replace(/[ئ]/g, "ي")
@@ -364,6 +366,84 @@ function isDeviceInfoRequest(prompt) {
 
 function executeLocalCommand(prompt) {
   const text = normalizeCommand(prompt);
+
+  // Safe native intents: Android asks for confirmation where appropriate.
+  if (/(افتح الكاميرا|شغل الكاميرا|open camera|ouvrir la camera)/.test(text)) {
+    window.ArtherNative?.openCamera?.();
+    return true;
+  }
+  if (/(افتح اعدادات الواي فاي|اعدادات الواي فاي|wifi settings|parametres wifi)/.test(text)) {
+    window.ArtherNative?.openSettings?.("wifi");
+    return true;
+  }
+  if (/(افتح اعدادات البلوتوث|اعدادات البلوتوث|bluetooth settings|parametres bluetooth)/.test(text)) {
+    window.ArtherNative?.openSettings?.("bluetooth");
+    return true;
+  }
+  if (/(افتح اعدادات الشاشه|اعدادات الشاشه|display settings|parametres affichage)/.test(text)) {
+    window.ArtherNative?.openSettings?.("display");
+    return true;
+  }
+  if (/(افتح اعدادات الصوت|اعدادات الصوت|sound settings|parametres son)/.test(text)) {
+    window.ArtherNative?.openSettings?.("sound");
+    return true;
+  }
+  if (/(افتح اعدادات الموقع|اعدادات الموقع|location settings|parametres localisation)/.test(text)) {
+    window.ArtherNative?.openSettings?.("location");
+    return true;
+  }
+  const brightness = text.match(/(?:سطوع|اضاءه الشاشه|سطع الشاشه|brightness|luminosite).*?(\\d{1,3})\\s*%?/);
+  if (brightness) {
+    const level = Math.max(1, Math.min(100, Number(brightness[1])));
+    window.ArtherNative?.setBrightness?.(String(level));
+    return true;
+  }
+  if (/(ارفع|زيد|علي).*(سطوع|اضاءه الشاشه)|(increase|raise).*brightness/.test(text)) {
+    window.ArtherNative?.setBrightness?.("75");
+    return true;
+  }
+  if (/(اخفض|نقص|وطي).*(سطوع|اضاءه الشاشه)|(decrease|lower).*brightness/.test(text)) {
+    window.ArtherNative?.setBrightness?.("25");
+    return true;
+  }
+  const timer = text.match(/(?:مؤقت|تايمر|timer|minuteur)\\s*(\\d{1,3})\\s*(ثانيه|ثواني|دقيقه|دقائق|ساعه|ساعات|seconds?|minutes?|hours?)?/);
+  if (timer) {
+    let seconds = Number(timer[1]);
+    const unit = timer[2] || "دقائق";
+    if (/ثاني|second/.test(unit)) {}
+    else if (/ساع|hour/.test(unit)) seconds *= 3600;
+    else seconds *= 60;
+    window.ArtherNative?.createTimer?.(String(seconds));
+    return true;
+  }
+  const alarm = text.match(/(?:منبه|المنبه|alarm|reveil).*?(\\d{1,2})(?::| و )?(\\d{2})?/);
+  if (alarm) {
+    const hour = Number(alarm[1]), minute = Number(alarm[2] || 0);
+    if (hour < 24 && minute < 60) {
+      window.ArtherNative?.createAlarm?.(String(hour), String(minute), "ARTHER");
+      return true;
+    }
+  }
+  const phone = text.match(/(?:اتصل|اتصال|عيط|عيطلي|call|appelle)\\s*(?:ب|على|ل|au)?\\s*([+\\d][\\d\\s-]{5,})/);
+  if (phone) {
+    window.ArtherNative?.dialPhone?.(phone[1].replace(/[\\s-]/g, ""));
+    return true;
+  }
+  const sms = text.match(/(?:اكتب رساله|ارسل رساله|ابعث رساله|compose sms|sms)\\s+(?:الى|ل|to)?\\s*([+\\d][\\d\\s-]{5,})\\s+(?:نصها|محتواها|تقول|message)?\\s*(.+)/);
+  if (sms) {
+    window.ArtherNative?.composeSms?.(sms[1].replace(/[\\s-]/g, ""), sms[2]);
+    return true;
+  }
+  const map = text.match(/(?:افتح خرائط|افتح الخريطه|وجهني الى|اذهب الى|navigate to|maps to)\\s+(.+)/);
+  if (map) {
+    window.ArtherNative?.openMap?.(map[1]);
+    return true;
+  }
+  const website = text.match(/(?:افتح موقع|افتح الرابط|open website|open site|ouvre le site)\\s+(.+)/);
+  if (website) {
+    window.ArtherNative?.openWeb?.(website[1]);
+    return true;
+  }
 
   const volumeIntent = /(الصوت|مستوي الصوت|صوت الهاتف|volume|son du telephone)/.test(text);
   if (volumeIntent) {
@@ -563,6 +643,10 @@ if ($("stopVoice")) $("stopVoice").addEventListener("click", () => {
 if ($("home")) $("home").addEventListener("click", () => nativeAction("HOME"));
 if ($("back")) $("back").addEventListener("click", () => nativeAction("BACK"));
 if ($("scrollDown")) $("scrollDown").addEventListener("click", () => nativeAction("SCROLL_DOWN"));
+if ($("openCamera")) $("openCamera").addEventListener("click", () => window.ArtherNative?.openCamera?.());
+if ($("openWifi")) $("openWifi").addEventListener("click", () => window.ArtherNative?.openSettings?.("wifi"));
+if ($("openMap")) $("openMap").addEventListener("click", () => window.ArtherNative?.openMap?.("موقعي الحالي"));
+if ($("openAlarms")) $("openAlarms").addEventListener("click", () => window.ArtherNative?.createAlarm?.("-1","0",""));
 
 if ($("requestMic")) $("requestMic").addEventListener("click", () => {
   if (window.ArtherNative?.requestMicrophonePermission) {
