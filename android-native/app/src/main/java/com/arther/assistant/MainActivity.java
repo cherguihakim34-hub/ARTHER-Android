@@ -407,7 +407,9 @@ public class MainActivity extends BridgeActivity {
         private void sendStatus(String message) {
             String safe = JSONObject.quote(message);
             webView.post(() -> webView.evaluateJavascript(
-                "document.getElementById('voiceStatus').textContent=" + safe, null
+                "if(window.ArtherListeningStatus){window.ArtherListeningStatus(" + safe + ");}" +
+                "else if(document.getElementById('voiceStatus')){document.getElementById('voiceStatus').textContent=" + safe + ";}",
+                null
             ));
         }
     }
