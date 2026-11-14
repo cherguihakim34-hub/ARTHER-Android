@@ -12,6 +12,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import java.util.Locale;
 
 public class ArtherAccessibilityService extends AccessibilityService {
+
     private static ArtherAccessibilityService instance;
 
     @Override
@@ -38,45 +39,62 @@ public class ArtherAccessibilityService extends AccessibilityService {
 
     public static boolean perform(String raw) {
         if (instance == null || raw == null) return false;
+
         String command = raw.trim();
 
         try {
             switch (command.toUpperCase(Locale.ROOT)) {
                 case "HOME":
                     return instance.performGlobalAction(GLOBAL_ACTION_HOME);
+
                 case "BACK":
                     return instance.performGlobalAction(GLOBAL_ACTION_BACK);
+
                 case "RECENTS":
                     return instance.performGlobalAction(GLOBAL_ACTION_RECENTS);
+
                 case "NOTIFICATIONS":
                     return instance.performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS);
+
                 case "QUICK_SETTINGS":
                     return instance.performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS);
+
                 case "POWER_DIALOG":
                     return instance.performGlobalAction(GLOBAL_ACTION_POWER_DIALOG);
+
                 case "LOCK_SCREEN":
                     return Build.VERSION.SDK_INT >= 28 &&
                         instance.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN);
+
                 case "TAKE_SCREENSHOT":
                     return Build.VERSION.SDK_INT >= 28 &&
                         instance.performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT);
+
                 case "SCROLL_DOWN":
                     return instance.scroll(true);
+
                 case "SCROLL_UP":
                     return instance.scroll(false);
+
                 default:
                     if (command.startsWith("TYPE:"))
                         return instance.typeText(command.substring(5));
+
                     if (command.startsWith("CLICK_TEXT:"))
                         return instance.findAndAct(command.substring(11), false);
+
                     if (command.startsWith("LONG_CLICK_TEXT:"))
                         return instance.findAndAct(command.substring(16), true);
+
                     if (command.startsWith("TAP:"))
                         return instance.tap(command.substring(4), false);
+
                     if (command.startsWith("LONG_PRESS:"))
                         return instance.tap(command.substring(11), true);
+
                     if (command.startsWith("SWIPE:"))
                         return instance.swipe(command.substring(6));
+
                     return false;
             }
         } catch (Exception ignored) {
@@ -90,6 +108,7 @@ public class ArtherAccessibilityService extends AccessibilityService {
 
         AccessibilityNodeInfo focused =
             root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+
         if (focused == null) return false;
 
         Bundle args = new Bundle();
@@ -106,6 +125,7 @@ public class ArtherAccessibilityService extends AccessibilityService {
 
     private boolean findAndAct(String text, boolean longClick) {
         AccessibilityNodeInfo root = getRootInActiveWindow();
+
         return root != null &&
             findAndActNode(root, text.toLowerCase(Locale.ROOT), longClick);
     }
@@ -181,7 +201,6 @@ public class ArtherAccessibilityService extends AccessibilityService {
         );
     }
 
-    // SWIPE:x1,y1,x2,y2[,duration_ms]
     private boolean swipe(String coordinates) {
         String[] p = coordinates.split(",");
         if (p.length < 4) return false;
