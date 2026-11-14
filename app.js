@@ -130,8 +130,30 @@ function extractAppName(prompt) {
   return t.trim() || null;
 }
 
+function isDeviceInfoRequest(prompt) {
+  const t = normalizeCommand(prompt);
+  return /(معلومات|مواصفات|بيانات).*(هاتفي|الهاتف|الجهاز|تليفوني|تلفوني)|(هاتفي|الهاتف|الجهاز|تليفوني|تلفوني).*(معلومات|مواصفات|نوع|طراز)|(ما نوع|ما طراز|ما موديل|وش نوع|واش نوع|شنو نوع).*(هاتفي|الهاتف|جهازي|تليفوني)|device info|phone info|about this phone|informations du telephone|modele du telephone/.test(t);
+}
+
 function executeLocalCommand(prompt) {
   const text = normalizeCommand(prompt);
+
+  if (isDeviceInfoRequest(prompt)) {
+    if (window.ArtherNative?.getDeviceInfo) {
+      try {
+        const info = JSON.parse(window.ArtherNative.getDeviceInfo());
+        const answer = info.error || `معلومات الجهاز:
+الشركة: ${info.manufacturer}
+العلامة: ${info.brand}
+الطراز: ${info.model}
+إصدار Android: ${info.android_version} (SDK ${info.sdk})
+البطارية: ${info.battery_percent >= 0 ? info.battery_percent + "%" : "غير متاحة"}`;
+        show(answer);
+        speak(answer);
+      } catch (e) { show("تعذر قراءة معلومات الجهاز."); }
+    } else { show("وظيفة قراءة معلومات الجهاز غير موجودة في هذه النسخة."); }
+    return true;
+  }
 
   const flash = detectFlashCommand(prompt);
   if (flash) {
