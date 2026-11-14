@@ -417,7 +417,7 @@ function executeLocalCommand(prompt) {
     window.ArtherNative?.createTimer?.(String(seconds));
     return true;
   }
-  const alarm = text.match(/(?:منبه|المنبه|alarm|reveil).*?(\d{1,2})(?::| و )?(\d{2})?/);
+  const alarm = text.match(/(?:منبه|المنبه|alarm|reveil).*?(\d{1,2})(?:\s*[: ]\s*(\d{2}))?/);
   if (alarm) {
     const hour = Number(alarm[1]), minute = Number(alarm[2] || 0);
     if (hour < 24 && minute < 60) {
@@ -443,6 +443,11 @@ function executeLocalCommand(prompt) {
   const website = text.match(/(?:افتح موقع|افتح الرابط|open website|open site|ouvre le site)\s+(.+)/);
   if (website) {
     window.ArtherNative?.openWeb?.(website[1]);
+    return true;
+  }
+  const share = text.match(/(?:شارك النص|شارك|share text|partage)\s+(.+)/);
+  if (share) {
+    window.ArtherNative?.shareText?.(share[1]);
     return true;
   }
 
