@@ -471,7 +471,7 @@ async function checkConnection() {
 
 checkConnection();
 if (window.ArtherNative?.shizukuStatus) window.ArtherNative.shizukuStatus();
-if (window.ArtherNative?.startListening) startWakeWordMode();
+startWakeWordMode();
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
