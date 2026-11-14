@@ -277,6 +277,7 @@ window.ArtherCapabilities = function(raw) {
     const lines = [
       "الميكروفون: " + (c.microphone ? "مسموح" : "يحتاج إذناً"),
       "التحكم بالشاشة: " + (c.accessibility ? "مفعّل" : "غير مفعّل"),
+      "تعديل السطوع: " + (c.writeSettings ? "مسموح" : "يحتاج إذناً"),
       "Shizuku: " + (!c.shizukuRunning ? "غير مشغّل" : (c.shizukuGranted ? "متصل ومصرّح" : "ينتظر الإذن"))
     ];
     el.textContent = lines.join(" · ");
@@ -406,7 +407,7 @@ function executeLocalCommand(prompt) {
     window.ArtherNative?.setBrightness?.("25");
     return true;
   }
-  const timer = text.match(/(?:مؤقت|تايمر|timer|minuteur)\\s*(\\d{1,3})\\s*(ثانيه|ثواني|دقيقه|دقائق|ساعه|ساعات|seconds?|minutes?|hours?)?/);
+  const timer = text.match(/(?:مؤقت|تايمر|timer|minuteur)(?:\\s+لمده|\\s+لمدة|\\s+بعد|\\s+for)?\\s*(\\d{1,3})\\s*(ثانيه|ثواني|دقيقه|دقائق|ساعه|ساعات|seconds?|minutes?|hours?)?/);
   if (timer) {
     let seconds = Number(timer[1]);
     const unit = timer[2] || "دقائق";
@@ -646,7 +647,8 @@ if ($("scrollDown")) $("scrollDown").addEventListener("click", () => nativeActio
 if ($("openCamera")) $("openCamera").addEventListener("click", () => window.ArtherNative?.openCamera?.());
 if ($("openWifi")) $("openWifi").addEventListener("click", () => window.ArtherNative?.openSettings?.("wifi"));
 if ($("openMap")) $("openMap").addEventListener("click", () => window.ArtherNative?.openMap?.("موقعي الحالي"));
-if ($("openAlarms")) $("openAlarms").addEventListener("click", () => window.ArtherNative?.createAlarm?.("-1","0",""));
+if ($("openAlarms")) $("openAlarms").addEventListener("click", () => window.ArtherNative?.showAlarms?.());
+if ($("requestBrightness")) $("requestBrightness").addEventListener("click", () => window.ArtherNative?.requestBrightnessPermission?.());
 
 if ($("requestMic")) $("requestMic").addEventListener("click", () => {
   if (window.ArtherNative?.requestMicrophonePermission) {
