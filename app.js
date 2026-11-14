@@ -1,3 +1,4 @@
+
 "use strict";
 
 const API = "https://arther-api.onrender.com";
@@ -10,20 +11,20 @@ const voiceStatus = $("voiceStatus");
 
 let busy = false;
 
-function show(text) {
-  report.textContent = String(text || "");
+function show(message) {
+  report.textContent = String(message || "");
   report.classList.remove("hidden");
 }
 
-function speak(text) {
+function speak(message) {
   if (window.ArtherNative?.speak) {
-    window.ArtherNative.speak(String(text));
+    window.ArtherNative.speak(String(message));
     return;
   }
 
   if ("speechSynthesis" in window) {
     speechSynthesis.cancel();
-    const msg = new SpeechSynthesisUtterance(String(text));
+    const msg = new SpeechSynthesisUtterance(String(message));
     msg.lang = "ar-SA";
     msg.rate = 0.9;
     speechSynthesis.speak(msg);
@@ -79,24 +80,26 @@ function normalizeCommand(value) {
     .toLowerCase()
     .replace(/[أإآ]/g, "ا")
     .replace(/[ًٌٍَُِّْـ]/g, "")
+    .replace(/[إ]/g, "ا")
     .trim();
 }
 
 function detectFlashCommand(prompt) {
   const text = normalizeCommand(prompt);
 
-  const target = "(?:الفلاش|فلاش|المصباح|الكشاف|flash|torch|torche)";
+  const target =
+    "(?:الفلاش|فلاش|المصباح|الكشاف|ضوء الهاتف|ضو الهاتف|flash|torch|torche)";
 
   const on = new RegExp(
-    "(?:شغل|شغّل|افتح|ولع|اضئ|انر|شعل|turn on|enable|allume|active).*" +
+    "(?:شغل|تشغيل|شغّل|افتح|فتح|ولع|اضئ|انر|شعل|اشعل|قم بتشغيل|turn on|enable|allume|active).*" +
     target +
     "|" + target +
-    ".*(?:شغل|افتح|ولع|اضئ|انر|شعل|on|allume)",
+    ".*(?:شغل|تشغيل|افتح|ولع|اضئ|انر|شعل|on|allume)",
     "i"
   );
 
   const off = new RegExp(
-    "(?:اطف|اغلق|سكر|طفي|طفّي|turn off|disable|eteins|desactive).*" +
+    "(?:اطف|اطفاء|إطفاء|اغلق|سكر|طفي|طفّي|قم بإطفاء|turn off|disable|eteins|desactive).*" +
     target +
     "|" + target +
     ".*(?:اطف|اغلق|سكر|طفي|off|eteins)",
@@ -114,22 +117,22 @@ async function runArther() {
 
   if (!prompt || busy) return;
 
-  // تنفيذ أوامر الفلاش محلياً على الهاتف
+  // تنفيذ الفلاش مباشرة على الهاتف
   const flashCommand = detectFlashCommand(prompt);
 
   if (flashCommand) {
     if (!window.ArtherNative?.setFlash) {
-      show("التحكم بالفلاش غير متاح في هذه النسخة.");
+      show("التحكم بالفلاش غير متاح في هذه النسخة. ثبّت آخر إصدار من ARTHER.");
+      speak("التحكم بالفلاش غير متاح في هذه النسخة.");
       return;
     }
 
     show("جارٍ تنفيذ أمر الفلاش...");
-
     window.ArtherNative.setFlash(flashCommand);
     return;
   }
 
-  // بقية الأوامر والأسئلة ترسل إلى الخادم
+  // إرسال بقية الطلبات إلى الذكاء الاصطناعي
   busy = true;
   $("run").disabled = true;
   connection.textContent = "ARTHER يعالج طلبك...";
