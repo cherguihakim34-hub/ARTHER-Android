@@ -154,6 +154,7 @@ public class MainActivity extends BridgeActivity {
         public void startListening() {
             activity.runOnUiThread(() -> {
                 if (activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    sendStatus("أحتاج إذن الميكروفون. اسمح لـ ARTHER باستخدام الميكروفون.");
                     activity.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 701);
                     return;
                 }
