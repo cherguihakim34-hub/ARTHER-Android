@@ -93,6 +93,7 @@ public class MainActivity extends BridgeActivity {
                 JSONObject c = new JSONObject();
                 c.put("microphone", activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED);
                 c.put("camera", activity.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED);
+                c.put("writeSettings", Settings.System.canWrite(activity));
                 c.put("accessibility", ArtherAccessibilityService.isEnabled());
                 boolean running = Shizuku.pingBinder();
                 c.put("shizukuRunning", running);
@@ -592,6 +593,34 @@ public class MainActivity extends BridgeActivity {
             });
         }
 
+
+
+        @JavascriptInterface
+        public void requestBrightnessPermission() {
+            activity.runOnUiThread(() -> {
+                try {
+                    if (Settings.System.canWrite(activity)) {
+                        appStatus(true, "إذن تعديل السطوع ممنوح بالفعل");
+                        getCapabilities();
+                        return;
+                    }
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                        Uri.parse("package:" + activity.getPackageName()));
+                    activity.startActivity(intent);
+                } catch (Exception e) { appStatus(false, "تعذر فتح إذن تعديل إعدادات النظام"); }
+            });
+        }
+
+        @JavascriptInterface
+        public void showAlarms() {
+            activity.runOnUiThread(() -> {
+                try {
+                    Intent intent = new Intent(AlarmClock.ACTION_SHOW_ALARMS);
+                    if (intent.resolveActivity(activity.getPackageManager()) != null) activity.startActivity(intent);
+                    else appStatus(false, "لا يوجد تطبيق منبه متاح");
+                } catch (Exception e) { appStatus(false, "تعذر فتح المنبه"); }
+            });
+        }
 
         @JavascriptInterface
         public void openCamera() {
