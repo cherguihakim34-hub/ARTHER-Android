@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - arther-chatgpt-work
 
 jobs:
   build:
@@ -72,8 +73,8 @@ jobs:
 
           for source, target in files:
               content = source.read_text(encoding="utf-8-sig")
-              content = re.sub(r'^\s*<\?xml[^?]*\?>\s*', '', content)
-              content = '<?xml version="1.0" encoding="utf-8"?>\n' + content.lstrip()
+              content = re.sub(r'^\\s*<\\?xml[^?]*\\?>\\s*', '', content)
+              content = '<?xml version="1.0" encoding="utf-8"?>\\n' + content.lstrip()
               target.write_text(content, encoding="utf-8")
           PY
 
@@ -95,7 +96,7 @@ jobs:
               if item not in s:
                   s = s.replace(
                       "<application",
-                      item + "\n    <application",
+                      item + "\\n    <application",
                       1
                   )
 
@@ -115,7 +116,7 @@ jobs:
           """
 
           if "com.arther.assistant.ArtherAccessibilityService" not in s:
-              s = s.replace("</application>", service + "\n</application>")
+              s = s.replace("</application>", service + "\\n</application>")
 
           p.write_text(s)
           PY
