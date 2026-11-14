@@ -220,3 +220,23 @@ footer { margin-top: 36px; }
   .intro .orb { width: 126px; height: 126px; }
   .intro h1 { font-size: 25px; }
 }
+
+
+.permissions {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(145deg, #10263a, #0b1929);
+}
+.permissions h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  color: var(--cyan);
+}
+.permissions .status { line-height: 1.8; }
+.permissions .hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
