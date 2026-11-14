@@ -65,6 +65,11 @@ window.ArtherFlashResult = function(success, message) {
   speak(message);
 };
 
+window.ArtherShizukuResult = function(success, message) {
+  show(message);
+  speak(message);
+};
+
 window.ArtherAppResult = function(success, message) {
   show(message);
   speak(message);
@@ -251,6 +256,15 @@ $("home").addEventListener("click", () => nativeAction("HOME"));
 $("back").addEventListener("click", () => nativeAction("BACK"));
 $("scrollDown").addEventListener("click", () => nativeAction("SCROLL_DOWN"));
 
+$("shizuku").addEventListener("click", () => {
+  if (!window.ArtherNative?.requestShizukuPermission) {
+    show("ميزة Shizuku غير موجودة في هذه النسخة. ثبّت آخر تحديث من ARTHER.");
+    return;
+  }
+  show("جارٍ التحقق من Shizuku وطلب الصلاحية...");
+  window.ArtherNative.requestShizukuPermission();
+});
+
 async function checkConnection() {
   try {
     const response = await fetch(API + "/health");
@@ -267,3 +281,4 @@ async function checkConnection() {
 }
 
 checkConnection();
+if (window.ArtherNative?.shizukuStatus) window.ArtherNative.shizukuStatus();
