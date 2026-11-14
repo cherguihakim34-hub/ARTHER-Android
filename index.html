@@ -5,90 +5,50 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#081321">
-
   <title>ARTHER AI</title>
-
   <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
   <main class="app">
-
     <header>
       <div class="logo">A</div>
-
       <div>
         <b>ARTHER</b>
         <small>PERSONAL AI ASSISTANT</small>
       </div>
-
-      <span id="connection" class="pill">
-        يفحص الاتصال…
-      </span>
+      <span id="connection" class="pill">يفحص الاتصال...</span>
     </header>
 
     <section class="intro">
       <div class="orb">A</div>
-
-      <p class="kicker">THINK · PLAN · EXECUTE · VERIFY</p>
-
+      <p class="kicker">THINK · LISTEN · SPEAK · EXECUTE</p>
       <h1>مرحباً بك في ARTHER</h1>
-
-      <p>
-        مساعدك الذكي للتحليل والتخطيط وقراءة الملفات
-        وتنفيذ المهام المتاحة والتحقق من النتائج.
-      </p>
+      <p>مساعدك الذكي الصوتي والشخصي</p>
     </section>
 
     <section id="report" class="report hidden"></section>
 
     <section class="workspace">
-
-      <label for="question">ما المهمة التي تريد من ARTHER تنفيذها؟</label>
-
-      <textarea
-        id="question"
-        rows="5"
-        placeholder="اكتب طلبك هنا..."
-      ></textarea>
+      <label for="question">أعطِ أمرك إلى ARTHER</label>
+      <textarea id="question" rows="4"
+        placeholder="اكتب أمرك أو اضغط على الميكروفون..."></textarea>
 
       <div class="actions">
-        <button id="run" class="primary">
-          شغّل ARTHER
-        </button>
-
-        <button id="clear" class="secondary">
-          مسح
-        </button>
+        <button id="listen" class="mic">🎙️ استمع إليّ</button>
+        <button id="run" class="primary">تنفيذ الأمر</button>
+        <button id="stopVoice" class="secondary">إيقاف الصوت</button>
       </div>
 
-      <details>
-        <summary>تنفيذ تجربة Python يدوياً</summary>
+      <div class="actions">
+        <button id="home" class="secondary">الشاشة الرئيسية</button>
+        <button id="back" class="secondary">رجوع</button>
+        <button id="scrollDown" class="secondary">تمرير للأسفل</button>
+      </div>
 
-        <p class="warning">
-          تنفيذ Python غير متاح حالياً على الخادم.
-        </p>
-
-        <textarea
-          id="code"
-          rows="6"
-          dir="ltr"
-          placeholder="Python code..."
-        ></textarea>
-
-        <button id="execute" class="secondary">
-          تنفيذ الكود
-        </button>
-
-        <pre id="output"></pre>
-      </details>
-
+      <p id="voiceStatus" class="status">الصوت جاهز</p>
     </section>
 
-    <footer>
-      ARTHER · THINK · PLAN · EXECUTE · VERIFY
-    </footer>
-
+    <footer>ARTHER · YOUR PERSONAL ASSISTANT</footer>
   </main>
 
   <script src="app.js"></script>
