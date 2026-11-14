@@ -139,7 +139,7 @@ public class MainActivity extends BridgeActivity {
                 result.put("text", ArtherAccessibilityService.getCachedScreenText());
                 return result.toString();
             } catch (Exception e) {
-                return "{\\"available\\":false,\\"text\\":\\"تعذر قراءة الشاشة\\"}";
+                return "{}";
             }
         }
 
