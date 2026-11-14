@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
@@ -16,44 +15,36 @@
         <b>ARTHER</b>
         <small>PERSONAL AI ASSISTANT</small>
       </div>
-      <span id="connection" class="pill">يفحص الاتصال...</span>
+      <span id="connection" class="pill">يفحص الاتصال…</span>
     </header>
 
     <section class="intro">
       <div class="orb">A</div>
-      <p class="kicker">PERSONAL AI · VOICE CONTROL</p>
-      <h1>أنا هنا، تفضل.</h1>
-      <p>قل «آرثر» ثم أعطني أمرك بصوتك</p>
+      <p class="kicker">THINK · PLAN · EXECUTE · VERIFY</p>
+      <h1>مرحباً بك في ARTHER</h1>
+      <p>مساعدك الذكي للتحليل والتخطيط وقراءة الملفات وتنفيذ المهام المتاحة والتحقق من النتائج.</p>
     </section>
 
     <section id="report" class="report hidden"></section>
 
     <section class="workspace">
-      <label for="question">الأوامر الصوتية</label>
-      <textarea id="question" rows="4"
-        placeholder="اكتب أمرك أو اضغط على الميكروفون..."></textarea>
-
+      <label for="question">ما المهمة التي تريد من ARTHER تنفيذها؟</label>
+      <textarea id="question" rows="5" placeholder="اكتب طلبك هنا..."></textarea>
       <div class="actions">
-        <button id="listen" class="mic">🎙️ استمع إليّ</button>
-        <button id="run" class="primary">تنفيذ الأمر</button>
-        <button id="stopVoice" class="secondary">إيقاف الصوت</button>
+        <button id="run" class="primary">شغّل ARTHER</button>
+        <button id="clear" class="secondary">مسح</button>
       </div>
-
-      <div class="actions">
-        <button id="home" class="secondary">الشاشة الرئيسية</button>
-        <button id="back" class="secondary">رجوع</button>
-        <button id="scrollDown" class="secondary">تمرير للأسفل</button>
-      </div>
-
-      <div class="actions">
-        <button id="shizuku" class="secondary">ربط Shizuku</button>
-      </div>
-      <p id="voiceStatus" class="status">الصوت جاهز</p>
+      <details>
+        <summary>تنفيذ تجربة Python يدوياً</summary>
+        <p class="warning">تنفيذ Python غير متاح حالياً على الخادم.</p>
+        <textarea id="code" rows="6" dir="ltr" placeholder="Python code..."></textarea>
+        <button id="execute" class="secondary">تنفيذ الكود</button>
+        <pre id="output"></pre>
+      </details>
     </section>
 
-    <footer>ARTHER · ALWAYS READY WHEN THE APP IS OPEN</footer>
+    <footer>ARTHER · THINK · PLAN · EXECUTE · VERIFY</footer>
   </main>
-
   <script src="app.js"></script>
 </body>
 </html>
