@@ -1,4 +1,3 @@
-
 name: Build ARTHER Android APK
 
 on:
@@ -42,6 +41,7 @@ jobs:
             "webDir": "www"
           }
           EOF
+
           npx cap add android
           npx cap sync android
 
@@ -52,6 +52,7 @@ jobs:
           mkdir -p android/app/src/main/res/values
 
           cp android-native/app/src/main/java/com/arther/assistant/MainActivity.java android/app/src/main/java/com/arther/assistant/
+
           cp android-native/app/src/main/java/com/arther/assistant/ArtherAccessibilityService.java android/app/src/main/java/com/arther/assistant/
 
           python3 - <<'PY'
@@ -86,12 +87,17 @@ jobs:
 
           permissions = [
               '<uses-permission android:name="android.permission.INTERNET" />',
-              '<uses-permission android:name="android.permission.RECORD_AUDIO" />'
+              '<uses-permission android:name="android.permission.RECORD_AUDIO" />',
+              '<uses-permission android:name="android.permission.CAMERA" />'
           ]
 
           for item in permissions:
               if item not in s:
-                  s = s.replace("<application", item + "\n    <application", 1)
+                  s = s.replace(
+                      "<application",
+                      item + "\n    <application",
+                      1
+                  )
 
           service = """
               <service
@@ -120,11 +126,13 @@ jobs:
           import xml.etree.ElementTree as ET
           from pathlib import Path
 
-          for p in [
+          files = [
               Path("android/app/src/main/res/xml/arther_accessibility.xml"),
               Path("android/app/src/main/res/values/arther_strings.xml"),
               Path("android/app/src/main/AndroidManifest.xml")
-          ]:
+          ]
+
+          for p in files:
               ET.parse(p)
               print("OK:", p)
           PY
