@@ -20,8 +20,15 @@ function scheduleWakeListening(delay = 500) {
   if (!wakeWordMode || document.hidden) return;
   clearTimeout(wakeRestartTimer);
   wakeRestartTimer = setTimeout(() => {
-    if (wakeWordMode && !document.hidden && !busy) {
-      window.ArtherNative?.startListening?.();
+    if (!wakeWordMode || document.hidden || busy) return;
+
+    // Capacitor may inject the native bridge after this script starts.
+    // Keep retrying briefly instead of silently losing the first listen request.
+    if (window.ArtherNative && typeof window.ArtherNative.startListening === "function") {
+      window.ArtherNative.startListening();
+    } else {
+      voiceStatus.textContent = "جارٍ تهيئة الميكروفون...";
+      scheduleWakeListening(600);
     }
   }, delay);
 }
