@@ -1,5 +1,5 @@
 
-name: Build ARTHER APK
+name: Build ARTHER Android APK
 
 on:
   workflow_dispatch:
@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -26,14 +26,14 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Prepare ARTHER
+      - name: Prepare web app
         run: |
           mkdir -p www
           cp index.html style.css app.js www/
           npm init -y
           npm install @capacitor/core@^7 @capacitor/cli@^7 @capacitor/android@^7
 
-      - name: Configure Android
+      - name: Configure Capacitor
         run: |
           cat > capacitor.config.json <<'EOF'
           {
@@ -44,6 +44,55 @@ jobs:
           EOF
           npx cap add android
           npx cap sync android
+
+      - name: Install native files
+        run: |
+          mkdir -p android/app/src/main/java/com/arther/assistant
+          mkdir -p android/app/src/main/res/xml
+
+          cp android-native/app/src/main/java/com/arther/assistant/MainActivity.java android/app/src/main/java/com/arther/assistant/
+
+          cp android-native/app/src/main/java/com/arther/assistant/ArtherAccessibilityService.java android/app/src/main/java/com/arther/assistant/
+
+          cp android-native/app/src/main/res/xml/arther_accessibility.xml android/app/src/main/res/xml/
+
+      - name: Configure permissions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+
+          permissions = [
+              '<uses-permission android:name="android.permission.INTERNET" />',
+              '<uses-permission android:name="android.permission.RECORD_AUDIO" />'
+          ]
+
+          for item in permissions:
+              if item not in s:
+                  s = s.replace("<application", item + "\n    <application", 1)
+
+          service = """
+              <service
+                  android:name="com.arther.assistant.ArtherAccessibilityService"
+                  android:label="ARTHER Phone Control"
+                  android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+                  android:exported="true">
+                  <intent-filter>
+                      <action android:name="android.accessibilityservice.AccessibilityService" />
+                  </intent-filter>
+                  <meta-data
+                      android:name="android.accessibilityservice"
+                      android:resource="@xml/arther_accessibility" />
+              </service>
+          """
+
+          if "com.arther.assistant.ArtherAccessibilityService" not in s:
+              s = s.replace("</application>", service + "\n</application>")
+
+          p.write_text(s)
+          PY
 
       - name: Build APK
         run: |
