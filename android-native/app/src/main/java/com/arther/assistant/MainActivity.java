@@ -371,8 +371,16 @@ public class MainActivity extends BridgeActivity {
 
         @JavascriptInterface
         public void typeText(String text) {
-            if (text == null) return;
-            activity.runOnUiThread(() -> ArtherAccessibilityService.perform("TYPE:" + text));
+            if (text == null) {
+                appStatus(false, "لم يصل نص للكتابة");
+                return;
+            }
+            activity.runOnUiThread(() -> {
+                boolean success = ArtherAccessibilityService.perform("TYPE:" + text);
+                appStatus(success,
+                    success ? "تم إدخال النص في الحقل المحدد" :
+                    "تعذرت الكتابة. افتح حقلاً قابلاً للتحرير وفعّل خدمة إمكانية الوصول");
+            });
         }
 
         private void sendStatus(String message) {
