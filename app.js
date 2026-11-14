@@ -103,11 +103,12 @@ async function runArther() {
     const answer = data.answer || "لم يصل رد من الخادم.";
     show(answer);
     connection.textContent = "متصل";
-
     speak(answer);
+
   } catch (error) {
     show("خطأ: " + error.message);
     connection.textContent = "خطأ في الاتصال";
+
   } finally {
     busy = false;
     $("run").disabled = false;
@@ -116,9 +117,10 @@ async function runArther() {
 
 function nativeAction(action) {
   if (!window.ArtherNative?.performAction) {
-    show("التحكم بالهاتف متاح في نسخة Android بعد تثبيت خدمة إمكانية الوصول وتفعيلها.");
+    show("التحكم يحتاج إلى تفعيل خدمة إمكانية الوصول.");
     return;
   }
+
   window.ArtherNative.performAction(action);
 }
 
@@ -128,6 +130,7 @@ $("run").addEventListener("click", runArther);
 $("stopVoice").addEventListener("click", () => {
   if (window.ArtherNative?.stopSpeaking)
     window.ArtherNative.stopSpeaking();
+
   if ("speechSynthesis" in window)
     speechSynthesis.cancel();
 });
@@ -140,10 +143,13 @@ async function checkConnection() {
   try {
     const r = await fetch(API + "/health");
     if (!r.ok) throw new Error("offline");
+
     const h = await r.json();
+
     connection.textContent = h.ai_configured
       ? "ARTHER متصل"
       : "الخادم متصل والذكاء غير مضبوط";
+
   } catch {
     connection.textContent = "غير متصل";
   }
