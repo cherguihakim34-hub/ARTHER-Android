@@ -39,7 +39,7 @@ function show(message) {
 
 function speak(message) {
   const value = String(message || "");
-  const delay = Math.min(20000, Math.max(1800, value.split(/\\s+/).length * 380));
+  const delay = Math.min(20000, Math.max(1800, value.split(/\s+/).length * 380));
   if (window.ArtherNative?.speak) {
     window.ArtherNative.speak(value);
     scheduleWakeListening(delay);
@@ -104,7 +104,7 @@ window.ArtherVoiceResult = function(text) {
   }
 
   const normalized = normalizeCommand(spoken);
-  const words = normalized.split(/\\s+/);
+  const words = normalized.split(/\s+/);
   const wakeWords = new Set(["ارثر", "arther", "arthur", "آرثر"]);
   const wakeIndex = words.findIndex(word => wakeWords.has(word));
 
