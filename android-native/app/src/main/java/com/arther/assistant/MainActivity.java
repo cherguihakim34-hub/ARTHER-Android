@@ -1,3 +1,4 @@
+
 package com.arther.assistant;
 
 import android.Manifest;
@@ -39,6 +40,8 @@ public class MainActivity extends BridgeActivity {
         int requestCode, String[] permissions, int[] grantResults
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (artherBridge == null) return;
 
         if (requestCode == 701 &&
             grantResults.length > 0 &&
@@ -299,6 +302,8 @@ public class MainActivity extends BridgeActivity {
         public void openApp(String appName) {
             activity.runOnUiThread(() -> {
                 try {
+                    if (appName == null || appName.trim().isEmpty()) return;
+
                     String wanted = appName.toLowerCase(Locale.ROOT);
                     PackageManager pm = activity.getPackageManager();
 
@@ -333,6 +338,8 @@ public class MainActivity extends BridgeActivity {
 
         @JavascriptInterface
         public void typeText(String text) {
+            if (text == null) return;
+
             activity.runOnUiThread(() ->
                 ArtherAccessibilityService.perform("TYPE:" + text)
             );
