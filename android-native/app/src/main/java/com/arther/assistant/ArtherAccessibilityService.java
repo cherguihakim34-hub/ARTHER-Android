@@ -45,6 +45,7 @@ public class ArtherAccessibilityService extends AccessibilityService {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) {
             cachedScreenText = "";
+            cachedPackageName = "";
             return;
         }
         StringBuilder out = new StringBuilder();
@@ -62,7 +63,11 @@ public class ArtherAccessibilityService extends AccessibilityService {
     ) {
         if (node == null || depth > 18 || count[0] >= 140 || out.length() >= 6000) return;
         count[0]++;
-        if (!node.isPassword()) {
+        if (!node.isVisibleToUser()) return;
+
+        // Never collect text from editable controls: this avoids reading
+        // typed drafts, search queries, and other potentially sensitive input.
+        if (!node.isPassword() && !node.isEditable()) {
             CharSequence text = node.getText();
             CharSequence desc = node.getContentDescription();
             appendUniqueLine(out, text);
