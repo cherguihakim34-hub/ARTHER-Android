@@ -192,7 +192,30 @@ window.ArtherFlashResult = function(success, message) {
 window.ArtherShizukuResult = function(success, message) {
   show(message);
   speak(message);
+  refreshCapabilities();
 };
+
+window.ArtherCapabilities = function(raw) {
+  const el = $("permissionStatus");
+  if (!el) return;
+  try {
+    const c = typeof raw === "string" ? JSON.parse(raw) : raw;
+    const lines = [
+      "الميكروفون: " + (c.microphone ? "مسموح" : "يحتاج إذناً"),
+      "التحكم بالشاشة: " + (c.accessibility ? "مفعّل" : "غير مفعّل"),
+      "Shizuku: " + (!c.shizukuRunning ? "غير مشغّل" : (c.shizukuGranted ? "متصل ومصرّح" : "ينتظر الإذن"))
+    ];
+    el.textContent = lines.join(" · ");
+  } catch (_) {
+    el.textContent = "تعذر قراءة حالة الصلاحيات.";
+  }
+};
+
+function refreshCapabilities() {
+  if (window.ArtherNative?.getCapabilities) {
+    try { window.ArtherNative.getCapabilities(); } catch (_) {}
+  }
+}
 
 window.ArtherAppResult = function(success, message) {
   show(message);
@@ -452,6 +475,18 @@ if ($("home")) $("home").addEventListener("click", () => nativeAction("HOME"));
 if ($("back")) $("back").addEventListener("click", () => nativeAction("BACK"));
 if ($("scrollDown")) $("scrollDown").addEventListener("click", () => nativeAction("SCROLL_DOWN"));
 
+if ($("requestMic")) $("requestMic").addEventListener("click", () => {
+  if (window.ArtherNative?.requestMicrophonePermission) {
+    window.ArtherNative.requestMicrophonePermission();
+  } else show("طلب إذن الميكروفون غير متاح في هذه النسخة.");
+});
+
+if ($("enableAccessibility")) $("enableAccessibility").addEventListener("click", () => {
+  if (window.ArtherNative?.openAccessibilitySettings) {
+    window.ArtherNative.openAccessibilitySettings();
+  } else show("تعذر فتح إعدادات إمكانية الوصول.");
+});
+
 if ($("shizuku")) $("shizuku").addEventListener("click", () => {
   if (!window.ArtherNative?.requestShizukuPermission) {
     show("ميزة Shizuku غير موجودة في هذه النسخة. ثبّت آخر تحديث من ARTHER.");
@@ -485,6 +520,7 @@ async function checkConnection() {
 }
 
 checkConnection();
+refreshCapabilities();
 if (window.ArtherNative?.shizukuStatus) window.ArtherNative.shizukuStatus();
 startWakeWordMode();
 
