@@ -8,6 +8,45 @@ const report = $("report");
 const question = $("question");
 const connection = $("connection");
 const voiceStatus = $("voiceStatus");
+const chatMessages = $("chatMessages");
+
+function getDeviceSessionId() {
+  const key = "arther_device_session_id";
+  try {
+    let id = localStorage.getItem(key);
+    if (!id) {
+      id = "arther-" + (window.crypto?.randomUUID?.() ||
+        (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)));
+      localStorage.setItem(key, id);
+    }
+    return id;
+  } catch (_) {
+    return "arther-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+  }
+}
+const SESSION_ID = getDeviceSessionId();
+
+function addChatMessage(role, message) {
+  if (!chatMessages || !String(message || "").trim()) return;
+  const empty = chatMessages.querySelector(".chat-empty");
+  if (empty) empty.remove();
+  const bubble = document.createElement("div");
+  bubble.className = "chat-message " + (role === "user" ? "user" : "assistant");
+  const speaker = document.createElement("span");
+  speaker.className = "speaker";
+  speaker.textContent = role === "user" ? "أنت" : "ARTHER";
+  const content = document.createElement("div");
+  content.textContent = String(message);
+  bubble.append(speaker, content);
+  chatMessages.appendChild(bubble);
+  while (chatMessages.children.length > 60) chatMessages.removeChild(chatMessages.firstElementChild);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function clearChat() {
+  if (!chatMessages) return;
+  chatMessages.innerHTML = '<p class="chat-empty">ستظهر إجابات ARTHER هنا. يمكنك التحدث أو الكتابة.</p>';
+}
 
 let busy = false;
 let lastFlashOn = false;
@@ -430,6 +469,7 @@ async function runArther() {
     return;
   }
 
+  addChatMessage("user", prompt);
   busy = true;
   if ($("run")) $("run").disabled = true;
   connection.textContent = "ARTHER يعالج طلبك...";
@@ -441,7 +481,7 @@ async function runArther() {
       body: JSON.stringify({
         prompt,
         language: "auto",
-        session_id: "arther-android"
+        session_id: SESSION_ID
       })
     });
 
@@ -449,11 +489,13 @@ async function runArther() {
     if (!response.ok) throw new Error(data.detail || "فشل الاتصال بالخادم");
 
     const answer = data.answer || "لم يصل رد من الخادم.";
+    addChatMessage("assistant", answer);
     show(answer);
     connection.textContent = "متصل";
     speak(answer);
 
   } catch (error) {
+    addChatMessage("assistant", "تعذر إكمال الطلب: " + error.message);
     show("خطأ: " + error.message);
     connection.textContent = "خطأ في الاتصال";
 
@@ -465,6 +507,7 @@ async function runArther() {
 
 if ($("listen")) $("listen").addEventListener("click", startWakeWordMode);
 if ($("run")) $("run").addEventListener("click", runArther);
+if ($("clearChat")) $("clearChat").addEventListener("click", clearChat);
 if ($("clearText")) $("clearText").addEventListener("click", () => {
   question.value = "";
   question.focus();
