@@ -244,8 +244,8 @@ function executeLocalCommand(prompt) {
   const typeMatch = text.match(/(?:اكتب|اكتب النص|اكتب له|type)\s+(.+)/);
   if (typeMatch) {
     if (window.ArtherNative?.typeText) {
+      show("جارٍ إدخال النص في الحقل المحدد...");
       window.ArtherNative.typeText(typeMatch[1].trim());
-      show("تم إرسال النص إلى حقل الكتابة المحدد.");
     } else show("خدمة الكتابة غير متاحة. فعّل خدمة إمكانية الوصول.");
     return true;
   }
