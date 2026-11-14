@@ -33,6 +33,9 @@ jobs:
           npm init -y
           npm install @capacitor/core@^7 @capacitor/cli@^7 @capacitor/android@^7
 
+      - name: Validate JavaScript
+        run: node --check app.js
+
       - name: Configure Capacitor
         run: |
           cat > capacitor.config.json <<'EOF'
