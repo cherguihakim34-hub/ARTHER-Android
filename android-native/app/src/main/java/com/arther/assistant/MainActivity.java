@@ -126,7 +126,7 @@ public class MainActivity extends BridgeActivity {
                 info.put("language", Locale.getDefault().toLanguageTag());
                 return info.toString();
             } catch (Exception e) {
-                return "{\\"error\\":\\"تعذر قراءة معلومات الجهاز\\"}";
+                return JSONObject.quote("تعذر قراءة معلومات الجهاز");
             }
         }
 
