@@ -213,15 +213,15 @@ function executeLocalCommand(prompt) {
   }
 
   const navigation = [
-    [/(الرئيسيه|اذهب للرئيسيه|الشاشه الرئيسيه|home)$/, "HOME"],
-    [/(رجوع|ارجع|الى الخلف|back)$/, "BACK"],
-    [/(التطبيقات المفتوحه|التطبيقات الاخيره|اخر التطبيقات|recent apps)$/, "RECENTS"],
-    [/(افتح الاشعارات|اظهر الاشعارات|شريط الاشعارات|notifications)$/, "NOTIFICATIONS"],
-    [/(الاعدادات السريعه|لوحه الاختصارات|quick settings)$/, "QUICK_SETTINGS"],
-    [/(اقفل الهاتف|اقفل الشاشه|قفل الشاشه|lock screen)$/, "LOCK_SCREEN"],
-    [/(التقط صوره للشاشه|لقطه شاشه|سكرين شوت|screenshot)$/, "TAKE_SCREENSHOT"],
-    [/(انزل|مرر للاسفل|انزل الصفحه|scroll down)$/, "SCROLL_DOWN"],
-    [/(اصعد|مرر للاعلى|اصعد الصفحه|scroll up)$/, "SCROLL_UP"]
+    [/(الرئيسيه|اذهب للرئيسيه|الشاشه الرئيسيه|home|accueil|ecran d accueil)$/, "HOME"],
+    [/(رجوع|ارجع|الى الخلف|back|retour|revenir en arriere)$/, "BACK"],
+    [/(التطبيقات المفتوحه|التطبيقات الاخيره|اخر التطبيقات|recent apps|applications recentes)$/, "RECENTS"],
+    [/(افتح الاشعارات|اظهر الاشعارات|شريط الاشعارات|notifications|ouvrir les notifications)$/, "NOTIFICATIONS"],
+    [/(الاعدادات السريعه|لوحه الاختصارات|quick settings|parametres rapides)$/, "QUICK_SETTINGS"],
+    [/(اقفل الهاتف|اقفل الشاشه|قفل الشاشه|lock screen|verrouiller l ecran)$/, "LOCK_SCREEN"],
+    [/(التقط صوره للشاشه|لقطه شاشه|سكرين شوت|screenshot|capture d ecran)$/, "TAKE_SCREENSHOT"],
+    [/(انزل|مرر للاسفل|انزل الصفحه|scroll down|defiler vers le bas)$/, "SCROLL_DOWN"],
+    [/(اصعد|مرر للاعلى|اصعد الصفحه|scroll up|defiler vers le haut)$/, "SCROLL_UP"]
   ];
 
   for (const [pattern, action] of navigation) {
@@ -242,19 +242,19 @@ function executeLocalCommand(prompt) {
     return true;
   }
 
-  const clickMatch = text.match(/(?:اضغط على|انقر على|اختار|اختر|click)\s+(.+)/);
+  const clickMatch = text.match(/(?:اضغط على|انقر على|اختار|اختر|click|appuie sur|clique sur|selectionne)\\s+(.+)/);
   if (clickMatch) {
     nativeAction("CLICK_TEXT:" + clickMatch[1].trim());
     return true;
   }
 
-  const longClickMatch = text.match(/(?:اضغط مطولا على|ضغط مطول على|long press)\s+(.+)/);
+  const longClickMatch = text.match(/(?:اضغط مطولا على|ضغط مطول على|long press|appui long sur|appuie longuement sur)\\s+(.+)/);
   if (longClickMatch) {
     nativeAction("LONG_CLICK_TEXT:" + longClickMatch[1].trim());
     return true;
   }
 
-  const typeMatch = text.match(/(?:اكتب|اكتب النص|اكتب له|type)\s+(.+)/);
+  const typeMatch = text.match(/(?:اكتب|اكتب النص|اكتب له|type|ecris|ecrire|tape)\\s+(.+)/);
   if (typeMatch) {
     if (window.ArtherNative?.typeText) {
       show("جارٍ إدخال النص في الحقل المحدد...");
