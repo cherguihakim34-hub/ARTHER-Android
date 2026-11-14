@@ -138,6 +138,31 @@ function isDeviceInfoRequest(prompt) {
 function executeLocalCommand(prompt) {
   const text = normalizeCommand(prompt);
 
+  if (/(اقرا الشاشه|ماذا يظهر على الشاشه|ما الموجود على الشاشه|اقرا محتوي الشاشه|read screen|what is on screen|lis la page)/.test(text)) {
+    if (!window.ArtherNative?.getScreenText) {
+      show("قراءة الشاشة غير متاحة في هذه النسخة.");
+      speak("قراءة الشاشة غير متاحة في هذه النسخة.");
+      return true;
+    }
+    try {
+      const snapshot = JSON.parse(window.ArtherNative.getScreenText());
+      if (!snapshot.available) {
+        show("فعّل خدمة إمكانية الوصول لـ ARTHER من إعدادات الهاتف، ثم أعد الأمر.");
+        speak("فعّل خدمة إمكانية الوصول أولاً.");
+      } else if (!snapshot.text) {
+        show("لم يصلني نص قابل للقراءة من الشاشة الحالية. قد يكون التطبيق يحجب محتواه.");
+        speak("لا يوجد نص ظاهر يمكن قراءته حالياً.");
+      } else {
+        const answer = "محتوى الشاشة الحالية:\\n" + snapshot.text.slice(0, 1800);
+        show(answer);
+        speak(answer);
+      }
+    } catch (error) {
+      show("تعذر قراءة محتوى الشاشة.");
+    }
+    return true;
+  }
+
   if (isDeviceInfoRequest(prompt)) {
     if (window.ArtherNative?.getDeviceInfo) {
       try {
