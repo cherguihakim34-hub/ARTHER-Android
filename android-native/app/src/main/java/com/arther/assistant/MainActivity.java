@@ -45,6 +45,12 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (artherBridge != null) artherBridge.getCapabilities();
+    }
+
+    @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (artherBridge == null) return;
@@ -55,6 +61,7 @@ public class MainActivity extends BridgeActivity {
                 artherBridge.applyPendingFlash();
             else artherBridge.reportFlash(false, "لم تسمح بإذن الكاميرا");
         }
+        artherBridge.getCapabilities();
     }
 
     public static class ArtherBridge {
