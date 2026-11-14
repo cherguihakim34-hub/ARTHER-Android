@@ -1,9 +1,10 @@
-
 package com.arther.assistant;
 
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
 import android.os.Bundle;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
@@ -30,24 +31,28 @@ public class MainActivity extends BridgeActivity {
 
         WebView webView = getBridge().getWebView();
         artherBridge = new ArtherBridge(this, webView);
-
         webView.addJavascriptInterface(artherBridge, "ArtherNative");
     }
 
     @Override
     public void onRequestPermissionsResult(
-        int requestCode,
-        String[] permissions,
-        int[] grantResults
+        int requestCode, String[] permissions, int[] grantResults
     ) {
-        super.onRequestPermissionsResult(
-            requestCode, permissions, grantResults
-        );
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
         if (requestCode == 701 &&
             grantResults.length > 0 &&
             grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             artherBridge.beginListening();
+        }
+
+        if (requestCode == 702) {
+            if (grantResults.length > 0 &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                artherBridge.applyPendingFlash();
+            } else {
+                artherBridge.reportFlash(false, "لم تسمح بإذن الكاميرا");
+            }
         }
     }
 
@@ -58,6 +63,7 @@ public class MainActivity extends BridgeActivity {
 
         private SpeechRecognizer recognizer;
         private TextToSpeech tts;
+        private String pendingFlash;
 
         ArtherBridge(MainActivity activity, WebView webView) {
             this.activity = activity;
@@ -65,9 +71,7 @@ public class MainActivity extends BridgeActivity {
 
             tts = new TextToSpeech(activity, status -> {
                 if (status == TextToSpeech.SUCCESS) {
-                    tts.setLanguage(
-                        Locale.forLanguageTag("ar-SA")
-                    );
+                    tts.setLanguage(Locale.forLanguageTag("ar-DZ"));
                     tts.setSpeechRate(0.92f);
                 }
             });
@@ -79,80 +83,67 @@ public class MainActivity extends BridgeActivity {
                 if (activity.checkSelfPermission(
                     Manifest.permission.RECORD_AUDIO
                 ) != PackageManager.PERMISSION_GRANTED) {
-
                     activity.requestPermissions(
-                        new String[]{
-                            Manifest.permission.RECORD_AUDIO
-                        }, 701
+                        new String[]{Manifest.permission.RECORD_AUDIO}, 701
                     );
                     return;
                 }
-
                 beginListening();
             });
         }
 
         void beginListening() {
             activity.runOnUiThread(() -> {
-
                 if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
                     sendStatus("التعرف على الصوت غير متاح");
                     return;
                 }
 
-                if (recognizer != null) {
-                    recognizer.destroy();
-                }
+                if (recognizer != null) recognizer.destroy();
 
-                recognizer =
-                    SpeechRecognizer.createSpeechRecognizer(activity);
+                recognizer = SpeechRecognizer.createSpeechRecognizer(activity);
 
-                recognizer.setRecognitionListener(
-                    new RecognitionListener() {
-
-                        @Override
-                        public void onReadyForSpeech(Bundle params) {
-                            sendStatus("أنا أستمع إليك...");
-                        }
-
-                        @Override public void onBeginningOfSpeech() {}
-                        @Override public void onRmsChanged(float value) {}
-                        @Override public void onBufferReceived(byte[] buffer) {}
-
-                        @Override
-                        public void onEndOfSpeech() {
-                            sendStatus("أحلل كلامك...");
-                        }
-
-                        @Override
-                        public void onError(int error) {
-                            sendStatus("تعذر سماع الأمر. حاول مجدداً.");
-                        }
-
-                        @Override
-                        public void onResults(Bundle results) {
-                            ArrayList<String> matches =
-                                results.getStringArrayList(
-                                    SpeechRecognizer.RESULTS_RECOGNITION
-                                );
-
-                            if (matches != null && !matches.isEmpty()) {
-                                String safe =
-                                    JSONObject.quote(matches.get(0));
-
-                                webView.post(() ->
-                                    webView.evaluateJavascript(
-                                        "window.ArtherVoiceResult(" +
-                                        safe + ")", null
-                                    )
-                                );
-                            }
-                        }
-
-                        @Override public void onPartialResults(Bundle b) {}
-                        @Override public void onEvent(int e, Bundle b) {}
+                recognizer.setRecognitionListener(new RecognitionListener() {
+                    @Override
+                    public void onReadyForSpeech(Bundle params) {
+                        sendStatus("أنا أستمع إليك...");
                     }
-                );
+
+                    @Override public void onBeginningOfSpeech() {}
+                    @Override public void onRmsChanged(float value) {}
+                    @Override public void onBufferReceived(byte[] buffer) {}
+
+                    @Override
+                    public void onEndOfSpeech() {
+                        sendStatus("أحلل كلامك...");
+                    }
+
+                    @Override
+                    public void onError(int error) {
+                        sendStatus("تعذر سماع الأمر. حاول مجدداً.");
+                    }
+
+                    @Override
+                    public void onResults(Bundle results) {
+                        ArrayList<String> matches =
+                            results.getStringArrayList(
+                                SpeechRecognizer.RESULTS_RECOGNITION
+                            );
+
+                        if (matches != null && !matches.isEmpty()) {
+                            String safe = JSONObject.quote(matches.get(0));
+                            webView.post(() ->
+                                webView.evaluateJavascript(
+                                    "window.ArtherVoiceResult(" + safe + ")",
+                                    null
+                                )
+                            );
+                        }
+                    }
+
+                    @Override public void onPartialResults(Bundle b) {}
+                    @Override public void onEvent(int e, Bundle b) {}
+                });
 
                 Intent intent =
                     new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
@@ -161,12 +152,10 @@ public class MainActivity extends BridgeActivity {
                     RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                     RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
                 );
-
                 intent.putExtra(
                     RecognizerIntent.EXTRA_LANGUAGE,
                     "ar-DZ"
                 );
-
                 intent.putExtra(
                     RecognizerIntent.EXTRA_MAX_RESULTS, 1
                 );
@@ -176,14 +165,108 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public void setFlash(String state) {
+            activity.runOnUiThread(() -> {
+                String value = state == null
+                    ? ""
+                    : state.trim().toUpperCase(Locale.ROOT);
+
+                if (!value.equals("ON") && !value.equals("OFF")) {
+                    reportFlash(false, "أمر الفلاش غير صحيح");
+                    return;
+                }
+
+                pendingFlash = value;
+
+                if (activity.checkSelfPermission(
+                    Manifest.permission.CAMERA
+                ) != PackageManager.PERMISSION_GRANTED) {
+                    activity.requestPermissions(
+                        new String[]{Manifest.permission.CAMERA}, 702
+                    );
+                    return;
+                }
+
+                applyPendingFlash();
+            });
+        }
+
+        void applyPendingFlash() {
+            activity.runOnUiThread(() -> {
+                if (pendingFlash == null) return;
+
+                String requested = pendingFlash;
+
+                try {
+                    CameraManager camera = (CameraManager)
+                        activity.getSystemService(
+                            android.content.Context.CAMERA_SERVICE
+                        );
+
+                    String selectedId = null;
+
+                    for (String id : camera.getCameraIdList()) {
+                        CameraCharacteristics characteristics =
+                            camera.getCameraCharacteristics(id);
+
+                        Boolean hasFlash = characteristics.get(
+                            CameraCharacteristics.FLASH_INFO_AVAILABLE
+                        );
+
+                        Integer facing = characteristics.get(
+                            CameraCharacteristics.LENS_FACING
+                        );
+
+                        if (Boolean.TRUE.equals(hasFlash) &&
+                            (facing == null ||
+                             facing == CameraCharacteristics.LENS_FACING_BACK)) {
+                            selectedId = id;
+                            break;
+                        }
+                    }
+
+                    if (selectedId == null) {
+                        reportFlash(false, "لا يوجد فلاش متاح في الجهاز");
+                        return;
+                    }
+
+                    camera.setTorchMode(
+                        selectedId, requested.equals("ON")
+                    );
+
+                    reportFlash(
+                        true,
+                        requested.equals("ON")
+                            ? "تم تشغيل الفلاش"
+                            : "تم إطفاء الفلاش"
+                    );
+
+                } catch (Exception e) {
+                    reportFlash(false, "تعذر التحكم في الفلاش");
+                } finally {
+                    pendingFlash = null;
+                }
+            });
+        }
+
+        void reportFlash(boolean success, String message) {
+            String safe = JSONObject.quote(message);
+            String script =
+                "if(window.ArtherFlashResult){" +
+                "window.ArtherFlashResult(" + success + "," + safe + ");}";
+
+            webView.post(() ->
+                webView.evaluateJavascript(script, null)
+            );
+        }
+
+        @JavascriptInterface
         public void speak(String text) {
             activity.runOnUiThread(() -> {
                 if (tts != null) {
                     tts.speak(
-                        text,
-                        TextToSpeech.QUEUE_FLUSH,
-                        null,
-                        "ARTHER_REPLY"
+                        text, TextToSpeech.QUEUE_FLUSH,
+                        null, "ARTHER_REPLY"
                     );
                 }
             });
@@ -216,25 +299,18 @@ public class MainActivity extends BridgeActivity {
         public void openApp(String appName) {
             activity.runOnUiThread(() -> {
                 try {
-                    String wanted =
-                        appName.toLowerCase(Locale.ROOT);
-
-                    PackageManager pm =
-                        activity.getPackageManager();
+                    String wanted = appName.toLowerCase(Locale.ROOT);
+                    PackageManager pm = activity.getPackageManager();
 
                     for (android.content.pm.ApplicationInfo app :
                         pm.getInstalledApplications(0)) {
 
-                        String label =
-                            pm.getApplicationLabel(app)
-                                .toString()
-                                .toLowerCase(Locale.ROOT);
+                        String label = pm.getApplicationLabel(app)
+                            .toString().toLowerCase(Locale.ROOT);
 
                         if (label.contains(wanted)) {
                             Intent launch =
-                                pm.getLaunchIntentForPackage(
-                                    app.packageName
-                                );
+                                pm.getLaunchIntentForPackage(app.packageName);
 
                             if (launch != null) {
                                 activity.startActivity(launch);
@@ -244,16 +320,12 @@ public class MainActivity extends BridgeActivity {
                     }
 
                     Toast.makeText(
-                        activity,
-                        "لم أجد التطبيق",
-                        Toast.LENGTH_SHORT
+                        activity, "لم أجد التطبيق", Toast.LENGTH_SHORT
                     ).show();
 
                 } catch (Exception e) {
                     Toast.makeText(
-                        activity,
-                        "تعذر فتح التطبيق",
-                        Toast.LENGTH_SHORT
+                        activity, "تعذر فتح التطبيق", Toast.LENGTH_SHORT
                     ).show();
                 }
             });
@@ -261,9 +333,9 @@ public class MainActivity extends BridgeActivity {
 
         @JavascriptInterface
         public void typeText(String text) {
-            activity.runOnUiThread(() -> {
-                ArtherAccessibilityService.perform("TYPE:" + text);
-            });
+            activity.runOnUiThread(() ->
+                ArtherAccessibilityService.perform("TYPE:" + text)
+            );
         }
 
         private void sendStatus(String message) {
@@ -284,12 +356,10 @@ public class MainActivity extends BridgeActivity {
             if (artherBridge.recognizer != null) {
                 artherBridge.recognizer.destroy();
             }
-
             if (artherBridge.tts != null) {
                 artherBridge.tts.shutdown();
             }
         }
-
         super.onDestroy();
     }
 }
