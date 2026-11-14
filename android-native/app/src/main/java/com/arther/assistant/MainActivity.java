@@ -257,8 +257,22 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public void performAction(String action) {
             activity.runOnUiThread(() -> {
-                boolean success = ArtherAccessibilityService.perform(action);
-                if (!success) Toast.makeText(activity, "فعّل صلاحية إمكانية الوصول لـ ARTHER", Toast.LENGTH_LONG).show();
+                boolean accepted = ArtherAccessibilityService.perform(action);
+                String message;
+                if (!ArtherAccessibilityService.isEnabled()) {
+                    message = "خدمة إمكانية الوصول غير مفعّلة. فعّلها من إعدادات الهاتف.";
+                } else if (accepted) {
+                    message = "تم إرسال الأمر إلى Android. تحقق من تغيّر الشاشة قبل متابعة الخطوة التالية.";
+                } else {
+                    message = "لم يقبل Android تنفيذ الأمر. قد لا يكون العنصر متاحاً على الشاشة الحالية.";
+                }
+                boolean result = accepted;
+                String safe = JSONObject.quote(message);
+                webView.post(() -> webView.evaluateJavascript(
+                    "if(window.ArtherActionResult){window.ArtherActionResult(" + result + "," + safe + ");}",
+                    null
+                ));
+                if (!accepted) Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
             });
         }
 
