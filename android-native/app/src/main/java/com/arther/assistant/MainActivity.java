@@ -205,6 +205,9 @@ public class MainActivity extends BridgeActivity {
                             case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
                                 reason = "لم أسمع كلاماً. قل آرثر بعد بدء الاستماع مباشرة";
                                 break;
+                            case 11:
+                                reason = "انقطع الاتصال بمحرك التعرف على الكلام. أعد تشغيل خدمة Google للتعرف على الكلام وتحقق من اتصال الإنترنت";
+                                break;
                             case 12:
                             case 13:
                                 reason = "لغة التعرف غير مدعومة أو غير محمّلة. تحقق من لغات تطبيق Google أو جرّب الفرنسية";
