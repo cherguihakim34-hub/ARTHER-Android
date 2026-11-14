@@ -11,14 +11,16 @@ const voiceStatus = $("voiceStatus");
 
 let busy = false;
 let lastFlashOn = false;
-let wakeWordMode = true;
+let wakeWordMode = !!voiceStatus;
 let wakeArmed = false;
 let wakeRestartTimer = null;
 let wakeArmTimer = null;
 let wakeError11Count = 0;
 
 function scheduleWakeListening(delay = 500) {
-  if (!wakeWordMode || document.hidden) return;
+  // The restored classic interface has no voice controls/status element.
+  // Keep voice wake-listening disabled there instead of crashing the page.
+  if (!voiceStatus || !wakeWordMode || document.hidden) return;
   clearTimeout(wakeRestartTimer);
   wakeRestartTimer = setTimeout(() => {
     if (!wakeWordMode || document.hidden || busy) return;
@@ -35,6 +37,10 @@ function scheduleWakeListening(delay = 500) {
 }
 
 function startWakeWordMode() {
+  if (!voiceStatus) {
+    wakeWordMode = false;
+    return;
+  }
   wakeWordMode = true;
   wakeArmed = false;
   voiceStatus.textContent = "بانتظار كلمة آرثر...";
