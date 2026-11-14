@@ -145,6 +145,11 @@ window.ArtherVoiceResult = function(text) {
   runArther();
 };
 
+window.ArtherDeviceResult = function(success, message) {
+  show(message);
+  if (message) speak(message);
+};
+
 window.ArtherFlashResult = function(success, message) {
   show(message);
   speak(message);
@@ -228,6 +233,22 @@ function isDeviceInfoRequest(prompt) {
 
 function executeLocalCommand(prompt) {
   const text = normalizeCommand(prompt);
+
+  const volumeIntent = /(الصوت|مستوي الصوت|صوت الهاتف|volume|son du telephone)/.test(text);
+  if (volumeIntent) {
+    let action = null;
+    if (/(ارفع|زيد|علي|زود|increase|up|monte|augment)/.test(text)) action = "UP";
+    else if (/(اخفض|نقص|وطي|خفض|decrease|down|baisse|diminue)/.test(text)) action = "DOWN";
+    else if (/(اكتم|كتم|صامت|mute|muet)/.test(text)) action = "MUTE";
+    else if (/(الغاء الكتم|الغ الكتم|اعد الصوت|ارجع الصوت|unmute|retablir le son)/.test(text)) action = "UNMUTE";
+    else if (/(اقصي|اقصى|اعلي|اعلى|max|maximum)/.test(text)) action = "MAX";
+    else if (/(ادني|ادنى|اقل|minimum|min|صفر)/.test(text)) action = "MIN";
+    if (action && window.ArtherNative?.controlVolume) {
+      window.ArtherNative.controlVolume(action);
+      show("جارٍ تعديل مستوى الصوت...");
+      return true;
+    }
+  }
 
   if (/(اقرا الشاشه|ماذا يظهر على الشاشه|ما الموجود على الشاشه|اقرا محتوي الشاشه|read screen|what is on screen|lis la page)/.test(text)) {
     if (!window.ArtherNative?.getScreenText) {
