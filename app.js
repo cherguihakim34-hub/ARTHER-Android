@@ -92,16 +92,17 @@ let speechRestartTimer = null;
 let wakeArmTimer = null;
 let wakeError11Count = 0;
 
+function canListenInBackground() {
+  try { return !!window.ArtherNative?.isVoiceServiceRunning?.(); }
+  catch (_) { return false; }
+}
+
 function scheduleWakeListening(delay = 500) {
-  // The restored classic interface has no voice controls/status element.
-  // Keep voice wake-listening disabled there instead of crashing the page.
-  if (!voiceStatus || !wakeWordMode || document.hidden) return;
+  // Keep the wake loop eligible while the Android foreground microphone service is active.
+  if (!voiceStatus || !wakeWordMode || (document.hidden && !canListenInBackground())) return;
   clearTimeout(wakeRestartTimer);
   wakeRestartTimer = setTimeout(() => {
-    if (!wakeWordMode || document.hidden || busy) return;
-
-    // Capacitor may inject the native bridge after this script starts.
-    // Keep retrying briefly instead of silently losing the first listen request.
+    if (!wakeWordMode || (document.hidden && !canListenInBackground()) || busy) return;
     if (window.ArtherNative && typeof window.ArtherNative.startListening === "function") {
       window.ArtherNative.startListening();
     } else {
@@ -110,7 +111,6 @@ function scheduleWakeListening(delay = 500) {
     }
   }, delay);
 }
-
 function startWakeWordMode() {
   if (!voiceStatus) {
     wakeWordMode = false;
@@ -845,7 +845,7 @@ startWakeWordMode();
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
-    clearTimeout(wakeRestartTimer);
+    if (!canListenInBackground()) clearTimeout(wakeRestartTimer);
     return;
   }
   if (wakeWordMode) scheduleWakeListening(500);
