@@ -3,6 +3,9 @@ package com.arther.assistant;
 import android.Manifest;
 import android.content.Intent;
 import android.net.Uri;
+import android.location.Location;
+import android.location.LocationManager;
+import android.os.CancellationSignal;
 import android.provider.AlarmClock;
 import android.provider.CalendarContract;
 import android.provider.Settings;
@@ -60,6 +63,7 @@ public class MainActivity extends BridgeActivity {
         if (artherBridge == null) return;
         if (requestCode == 701 && grantResults.length > 0 &&
             grantResults[0] == PackageManager.PERMISSION_GRANTED) artherBridge.beginListening();
+        if (requestCode == 703 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) artherBridge.beginLocationRequest();
         if (requestCode == 702) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
                 artherBridge.applyPendingFlash();
@@ -669,6 +673,72 @@ public class MainActivity extends BridgeActivity {
                     appStatus(true, "فتحت الرابط في المتصفح");
                 } catch (Exception e) { appStatus(false, "تعذر فتح الموقع"); }
             });
+        }
+
+
+        @JavascriptInterface
+        public void getCurrentLocation() {
+            activity.runOnUiThread(() -> {
+                boolean fine = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                boolean coarse = activity.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                if (!fine && !coarse) {
+                    activity.requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 703);
+                    return;
+                }
+                beginLocationRequest();
+            });
+        }
+
+        void beginLocationRequest() {
+            activity.runOnUiThread(() -> {
+                try {
+                    LocationManager manager = (LocationManager) activity.getSystemService(android.content.Context.LOCATION_SERVICE);
+                    boolean gps = manager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+                    boolean network = manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+                    if (!gps && !network) { sendLocationError("خدمة GPS مغلقة. فعّل الموقع من إعدادات الهاتف."); return; }
+                    String provider = gps ? LocationManager.GPS_PROVIDER : LocationManager.NETWORK_PROVIDER;
+                    if (android.os.Build.VERSION.SDK_INT >= 30) {
+                        manager.getCurrentLocation(provider, new CancellationSignal(), activity.getMainExecutor(), location -> {
+                            if (location != null) reportLocation(location);
+                            else {
+                                try {
+                                    Location last = manager.getLastKnownLocation(provider);
+                                    if (last != null) reportLocation(last);
+                                    else sendLocationError("لم يتم تحديد موقعك بعد. انتظر قليلاً في مكان مفتوح ثم أعد المحاولة.");
+                                } catch (SecurityException e) { sendLocationError("إذن الموقع غير ممنوح."); }
+                            }
+                        });
+                    } else {
+                        Location last = manager.getLastKnownLocation(provider);
+                        if (last != null) reportLocation(last);
+                        else sendLocationError("تعذر الحصول على موقع حالي. فعّل GPS والإنترنت ثم أعد المحاولة.");
+                    }
+                } catch (SecurityException e) { sendLocationError("اسمح لـ ARTHER بالوصول إلى موقعك من إعدادات التطبيقات."); }
+                catch (Exception e) { sendLocationError("خطأ GPS: " + e.getClass().getSimpleName()); }
+            });
+        }
+
+        private void reportLocation(Location location) {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("ok", true);
+                data.put("latitude", location.getLatitude());
+                data.put("longitude", location.getLongitude());
+                data.put("accuracy_m", location.hasAccuracy() ? location.getAccuracy() : JSONObject.NULL);
+                data.put("provider", location.getProvider());
+                String payload = JSONObject.quote(data.toString());
+                webView.post(() -> webView.evaluateJavascript("if(window.ArtherLocationResult){window.ArtherLocationResult(" + payload + ");}", null));
+            } catch (Exception ignored) {}
+        }
+
+        private void sendLocationError(String message) {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("ok", false);
+                data.put("error", message);
+                String payload = JSONObject.quote(data.toString());
+                webView.post(() -> webView.evaluateJavascript("if(window.ArtherLocationResult){window.ArtherLocationResult(" + payload + ");}", null));
+            } catch (Exception ignored) {}
         }
 
         @JavascriptInterface
