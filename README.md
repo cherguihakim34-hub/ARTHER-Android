@@ -21,7 +21,7 @@ Set these environment variables on the backend:
 
 ## Current capabilities
 - Voice recognition and text input.
-- Arabic, French and English responses (recognition language follows device language).
+- Selectable Arabic, French and English for speech recognition and spoken responses; automatic mode follows the device language.
 - Android intents for apps, maps, settings, calls, SMS composition, timers and alarms.
 - Optional Accessibility service for navigation, screen gestures, text entry and visible screen text.
 - Flashlight, volume, brightness (subject to Android permissions), device information and current location.
