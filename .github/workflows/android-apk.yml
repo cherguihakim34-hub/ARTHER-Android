@@ -61,9 +61,13 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          dependency = '    implementation "dev.rikka.shizuku:api:13.1.5"\n'
-          if dependency.strip() not in s:
-              s = s.replace("dependencies {", "dependencies {\n" + dependency, 1)
+          dependencies = [
+              '    implementation "dev.rikka.shizuku:api:13.1.5"\n',
+              '    implementation "dev.rikka.shizuku:provider:13.1.5"\n'
+          ]
+          for dependency in dependencies:
+              if dependency.strip() not in s:
+                  s = s.replace("dependencies {", "dependencies {\n" + dependency, 1)
           # Shizuku API 13.1.5 requires Android API 24 or newer.
           s = s.replace("minSdkVersion rootProject.ext.minSdkVersion", "minSdkVersion 24")
           # Keep the requested ARTHER release numbering visible in Android settings.
