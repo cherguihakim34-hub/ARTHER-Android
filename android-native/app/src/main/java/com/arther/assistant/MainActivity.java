@@ -62,7 +62,7 @@ public class MainActivity extends BridgeActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (artherBridge == null) return;
         if (requestCode == 701 && grantResults.length > 0 &&
-            grantResults[0] == PackageManager.PERMISSION_GRANTED) artherBridge.beginListening();
+            grantResults[0] == PackageManager.PERMISSION_GRANTED) artherBridge.startListening();
         if (requestCode == 703) {
             boolean locationGranted = false;
             for (int result : grantResults) {
@@ -294,6 +294,7 @@ public class MainActivity extends BridgeActivity {
         void beginListening() {
             activity.runOnUiThread(() -> {
                 if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
+                    activity.stopService(new Intent(activity, ArtherWakeService.class));
                     sendStatus("التعرف على الصوت غير متاح");
                     return;
                 }
