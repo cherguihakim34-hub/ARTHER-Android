@@ -88,6 +88,7 @@ let lastFlashOn = false;
 let wakeWordMode = !!voiceStatus;
 let wakeArmed = false;
 let wakeRestartTimer = null;
+let speechRestartTimer = null;
 let wakeArmTimer = null;
 let wakeError11Count = 0;
 
@@ -128,10 +129,14 @@ function show(message) {
 
 function speak(message) {
   const value = String(message || "");
-  const delay = Math.min(20000, Math.max(1800, value.split(/\s+/).length * 380));
   if (window.ArtherNative?.speak) {
+    clearTimeout(speechRestartTimer);
+    const fallbackDelay = Math.min(45000, Math.max(5000, value.split(/\s+/).length * 520));
+    speechRestartTimer = setTimeout(() => {
+      speechRestartTimer = null;
+      scheduleWakeListening(450);
+    }, fallbackDelay);
     window.ArtherNative.speak(value);
-    scheduleWakeListening(delay);
     return;
   }
   if ("speechSynthesis" in window) {
@@ -140,12 +145,18 @@ function speak(message) {
     msg.lang = preferredSpeechLanguage();
     msg.rate = 0.9;
     msg.onend = () => scheduleWakeListening(400);
+    msg.onerror = () => scheduleWakeListening(700);
     speechSynthesis.speak(msg);
   } else {
     scheduleWakeListening(1000);
   }
 }
 
+window.ArtherSpeechFinished = function() {
+  clearTimeout(speechRestartTimer);
+  speechRestartTimer = null;
+  scheduleWakeListening(450);
+};
 function preferredSpeechLanguage() {
   const choice = $("language")?.value || "auto";
   if (choice === "fr") return "fr-FR";
@@ -747,6 +758,8 @@ if ($("stopVoice")) $("stopVoice").addEventListener("click", () => {
   wakeArmed = false;
   clearTimeout(wakeRestartTimer);
   clearTimeout(wakeArmTimer);
+  clearTimeout(speechRestartTimer);
+  speechRestartTimer = null;
   window.ArtherNative?.stopSpeaking?.();
   window.ArtherNative?.stopListening?.();
   if ("speechSynthesis" in window) speechSynthesis.cancel();
