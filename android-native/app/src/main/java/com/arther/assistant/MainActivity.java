@@ -119,7 +119,8 @@ public class MainActivity extends BridgeActivity {
                 c.put("camera", activity.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED);
                 c.put("location", activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                     activity.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED);
-                c.put("writeSettings", Settings.System.canWrite(activity));                android.os.PowerManager power = (android.os.PowerManager)
+                c.put("writeSettings", Settings.System.canWrite(activity));
+                android.os.PowerManager power = (android.os.PowerManager)
                     activity.getSystemService(android.content.Context.POWER_SERVICE);
                 c.put("batteryOptimizationIgnored", android.os.Build.VERSION.SDK_INT < 23 ||
                     (power != null && power.isIgnoringBatteryOptimizations(activity.getPackageName())));
