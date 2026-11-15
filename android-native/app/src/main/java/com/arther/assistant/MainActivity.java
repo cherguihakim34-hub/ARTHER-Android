@@ -868,7 +868,7 @@ public class MainActivity extends BridgeActivity {
             try {
                 manager.getCurrentLocation(provider, new CancellationSignal(), activity.getMainExecutor(), location -> {
                     if (location != null) {
-                        long ageMs = Math.max(0L, System.currentTimeMillis() - location.getTime());
+                        long ageMs = locationAgeMillis(location);
                         boolean hasAccuracy = location.hasAccuracy();
                         float accuracy = hasAccuracy ? location.getAccuracy() : Float.MAX_VALUE;
                         if (ageMs <= 30000L && hasAccuracy && accuracy <= 100f) {
@@ -885,6 +885,15 @@ public class MainActivity extends BridgeActivity {
             }
         }
 
+        private long locationAgeMillis(Location location) {
+            if (location != null && location.getElapsedRealtimeNanos() > 0L) {
+                return Math.max(0L, (android.os.SystemClock.elapsedRealtimeNanos() -
+                    location.getElapsedRealtimeNanos()) / 1000000L);
+            }
+            return location == null ? Long.MAX_VALUE :
+                Math.max(0L, System.currentTimeMillis() - location.getTime());
+        }
+
         private void reportLocation(Location location) {
             try {
                 JSONObject data = new JSONObject();
@@ -893,6 +902,7 @@ public class MainActivity extends BridgeActivity {
                 data.put("longitude", location.getLongitude());
                 data.put("accuracy_m", location.hasAccuracy() ? location.getAccuracy() : JSONObject.NULL);
                 data.put("provider", location.getProvider());
+                data.put("fix_age_ms", locationAgeMillis(location));
                 String payload = JSONObject.quote(data.toString());
                 webView.post(() -> webView.evaluateJavascript("if(window.ArtherLocationResult){window.ArtherLocationResult(" + payload + ");}", null));
             } catch (Exception ignored) {}
