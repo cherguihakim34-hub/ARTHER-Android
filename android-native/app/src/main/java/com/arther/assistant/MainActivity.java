@@ -2,7 +2,6 @@ package com.arther.assistant;
 
 import android.Manifest;
 import android.content.Intent;
-import android.content.Context;
 import android.net.Uri;
 import android.location.Location;
 import android.location.LocationManager;
@@ -978,6 +977,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener);
+        stopService(new Intent(this, ArtherWakeService.class));
         if (artherBridge != null) {
             if (artherBridge.recognizer != null) artherBridge.recognizer.destroy();
             if (artherBridge.tts != null) artherBridge.tts.shutdown();
