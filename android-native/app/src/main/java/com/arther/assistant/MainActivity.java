@@ -741,29 +741,50 @@ public class MainActivity extends BridgeActivity {
             activity.runOnUiThread(() -> {
                 try {
                     LocationManager manager = (LocationManager) activity.getSystemService(android.content.Context.LOCATION_SERVICE);
-                    boolean gps = manager.isProviderEnabled(LocationManager.GPS_PROVIDER);
-                    boolean network = manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
-                    if (!gps && !network) { sendLocationError("خدمة GPS مغلقة. فعّل الموقع من إعدادات الهاتف."); return; }
-                    String provider = gps ? LocationManager.GPS_PROVIDER : LocationManager.NETWORK_PROVIDER;
-                    if (android.os.Build.VERSION.SDK_INT >= 30) {
-                        manager.getCurrentLocation(provider, new CancellationSignal(), activity.getMainExecutor(), location -> {
-                            if (location != null) reportLocation(location);
-                            else {
-                                try {
-                                    Location last = manager.getLastKnownLocation(provider);
-                                    if (last != null) reportLocation(last);
-                                    else sendLocationError("لم يتم تحديد موقعك بعد. انتظر قليلاً في مكان مفتوح ثم أعد المحاولة.");
-                                } catch (SecurityException e) { sendLocationError("إذن الموقع غير ممنوح."); }
-                            }
-                        });
-                    } else {
-                        Location last = manager.getLastKnownLocation(provider);
-                        if (last != null) reportLocation(last);
-                        else sendLocationError("تعذر الحصول على موقع حالي. فعّل GPS والإنترنت ثم أعد المحاولة.");
+                    List<String> providers = new ArrayList<>();
+                    if (manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) providers.add(LocationManager.GPS_PROVIDER);
+                    if (manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) providers.add(LocationManager.NETWORK_PROVIDER);
+                    if (providers.isEmpty()) {
+                        sendLocationError("خدمة الموقع مغلقة. فعّل الموقع من إعدادات الهاتف ثم أعد المحاولة.");
+                        return;
                     }
-                } catch (SecurityException e) { sendLocationError("اسمح لـ ARTHER بالوصول إلى موقعك من إعدادات التطبيقات."); }
-                catch (Exception e) { sendLocationError("خطأ GPS: " + e.getClass().getSimpleName()); }
+                    if (android.os.Build.VERSION.SDK_INT < 30) {
+                        sendLocationError("يلزم تحديث Android للحصول على موقع مباشر موثوق. لن أرسل موقعاً قديماً محفوظاً.");
+                        return;
+                    }
+                    requestFreshLocation(manager, providers, 0);
+                } catch (SecurityException e) {
+                    sendLocationError("اسمح لـ ARTHER بالوصول إلى موقعك الدقيق من إعدادات التطبيقات.");
+                } catch (Exception e) {
+                    sendLocationError("خطأ GPS: " + e.getClass().getSimpleName());
+                }
             });
+        }
+
+        private void requestFreshLocation(LocationManager manager, List<String> providers, int index) {
+            if (index >= providers.size()) {
+                sendLocationError("لم أحصل على تثبيت GPS حديث ودقيق. فعّل الموقع الدقيق، وانتظر 20-30 ثانية قرب نافذة أو في مكان مفتوح، ثم أعد المحاولة. لم أستخدم موقعاً قديماً.");
+                return;
+            }
+            String provider = providers.get(index);
+            try {
+                manager.getCurrentLocation(provider, new CancellationSignal(), activity.getMainExecutor(), location -> {
+                    if (location != null) {
+                        long ageMs = Math.max(0L, System.currentTimeMillis() - location.getTime());
+                        boolean hasAccuracy = location.hasAccuracy();
+                        float accuracy = hasAccuracy ? location.getAccuracy() : Float.MAX_VALUE;
+                        if (ageMs <= 30000L && hasAccuracy && accuracy <= 100f) {
+                            reportLocation(location);
+                            return;
+                        }
+                    }
+                    requestFreshLocation(manager, providers, index + 1);
+                });
+            } catch (SecurityException e) {
+                sendLocationError("إذن الموقع الدقيق غير ممنوح لـ ARTHER.");
+            } catch (Exception e) {
+                requestFreshLocation(manager, providers, index + 1);
+            }
         }
 
         private void reportLocation(Location location) {
