@@ -125,6 +125,7 @@ public class MainActivity extends BridgeActivity {
                     activity.getSystemService(android.content.Context.POWER_SERVICE);
                 c.put("batteryOptimizationIgnored", android.os.Build.VERSION.SDK_INT < 23 ||
                     (power != null && power.isIgnoringBatteryOptimizations(activity.getPackageName())));
+                c.put("voiceServiceRunning", ArtherWakeService.isRunning);
                 c.put("accessibility", ArtherAccessibilityService.isEnabled());
                 boolean running = Shizuku.pingBinder();
                 c.put("shizukuRunning", running);
@@ -341,7 +342,7 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 recognizer.setRecognitionListener(new RecognitionListener() {
-                    @Override public void onReadyForSpeech(Bundle params) { sendStatus("أنا أستمع إليك..."); }
+                    @Override public void onReadyForSpeech(Bundle params) { sendStatus("أنا أستمع إليك..."); getCapabilities(); }
                     @Override public void onBeginningOfSpeech() {}
                     @Override public void onRmsChanged(float value) {}
                     @Override public void onBufferReceived(byte[] buffer) {}
