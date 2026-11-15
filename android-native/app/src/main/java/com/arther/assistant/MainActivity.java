@@ -89,12 +89,14 @@ public class MainActivity extends BridgeActivity {
         private TextToSpeech tts;
         private String pendingFlash;
         private String speechLanguageOverride = "auto";
+        private boolean ttsReady = false;
 
         ArtherBridge(MainActivity activity, WebView webView) {
             this.activity = activity;
             this.webView = webView;
             tts = new TextToSpeech(activity, status -> {
                 if (status == TextToSpeech.SUCCESS) {
+                    ttsReady = true;
                     tts.setLanguage(Locale.forLanguageTag(preferredLanguageTag()));
                     tts.setSpeechRate(0.92f);
                 }
@@ -237,12 +239,14 @@ public class MainActivity extends BridgeActivity {
             final String selected = value;
             activity.runOnUiThread(() -> {
                 speechLanguageOverride = selected;
-                if (tts != null) {
+                if (tts != null && ttsReady) {
                     int result = tts.setLanguage(Locale.forLanguageTag(preferredLanguageTag()));
                     sendStatus(result == TextToSpeech.LANG_MISSING_DATA ||
                         result == TextToSpeech.LANG_NOT_SUPPORTED
                         ? "حزمة صوت اللغة المختارة غير متاحة على الهاتف"
                         : "تم اختيار لغة الصوت: " + selected);
+                } else {
+                    sendStatus("تم حفظ اختيار اللغة، جارٍ تهيئة الصوت");
                 }
             });
         }
