@@ -394,6 +394,20 @@ function isDeviceInfoRequest(prompt) {
 function executeLocalCommand(prompt) {
   const text = normalizeCommand(prompt);
 
+  // Handle compound location requests before the generic "open app" parser.
+  // Otherwise "open Google Maps and find my location" is consumed as app launch only.
+  if (/(موقعي الحالي|اين انا|وين راني|حدد موقعي|اعرف موقعي|مكاني الحالي|where am i|my current location|find my location|ma position actuelle|ou suis je)/.test(text)) {
+    if (window.ArtherNative?.getCurrentLocation) {
+      show("جارٍ تحديد موقع الهاتف عبر GPS...");
+      window.ArtherNative.getCurrentLocation();
+    } else {
+      const message = "ميزة تحديد الموقع غير موجودة في هذه النسخة. حدّث ARTHER.";
+      show(message);
+      speak(message);
+    }
+    return true;
+  }
+
   // Safe native intents: Android asks for confirmation where appropriate.
   if (/(افتح الكاميرا|شغل الكاميرا|open camera|ouvrir la camera)/.test(text)) {
     window.ArtherNative?.openCamera?.();
@@ -474,15 +488,6 @@ function executeLocalCommand(prompt) {
     return true;
   }
 
-  if (/(موقعي الحالي|اين انا|وين راني|حدد موقعي|اعرف موقعي|مكاني الحالي|where am i|my current location|find my location|ma position actuelle|ou suis je)/.test(text)) {
-    if (window.ArtherNative?.getCurrentLocation) {
-      show("جارٍ تحديد موقع الهاتف عبر GPS...");
-      window.ArtherNative.getCurrentLocation();
-    } else {
-      show("ميزة تحديد الموقع غير موجودة في هذه النسخة. حدّث ARTHER.");
-    }
-    return true;
-  }
   const map = text.match(/(?:افتح خرائط|افتح الخريطه|وجهني الى|اذهب الى|navigate to|maps to)\s+(.+)/);
   if (map) {
     window.ArtherNative?.openMap?.(map[1]);
