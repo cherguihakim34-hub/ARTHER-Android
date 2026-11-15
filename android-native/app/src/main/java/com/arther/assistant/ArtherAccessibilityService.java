@@ -201,15 +201,18 @@ public class ArtherAccessibilityService extends AccessibilityService {
         AccessibilityNodeInfo root = getRootInActiveWindow();
 
         return root != null &&
-            findAndActNode(root, text.toLowerCase(Locale.ROOT), longClick);
+            findAndActNode(root, text.toLowerCase(Locale.ROOT), longClick, 0, new int[]{0});
     }
 
     private boolean findAndActNode(
         AccessibilityNodeInfo node,
         String wanted,
-        boolean longClick
+        boolean longClick,
+        int depth,
+        int[] visited
     ) {
-        if (node == null) return false;
+        if (node == null || depth > 30 || visited[0] >= 500) return false;
+        visited[0]++;
 
         CharSequence label = node.getText();
         CharSequence description = node.getContentDescription();
@@ -243,7 +246,7 @@ public class ArtherAccessibilityService extends AccessibilityService {
             AccessibilityNodeInfo child = node.getChild(i);
 
             if (child != null &&
-                findAndActNode(child, wanted, longClick)) {
+                findAndActNode(child, wanted, longClick, depth + 1, visited)) {
                 return true;
             }
         }
