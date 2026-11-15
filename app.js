@@ -766,3 +766,4 @@ document.addEventListener("visibilitychange", () => {
   }
   if (wakeWordMode) scheduleWakeListening(500);
 });
+// Native GPS retrieval is handled by MainActivity and permission declarations in the Android build workflow.
