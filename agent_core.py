@@ -1017,7 +1017,8 @@ async def ask_agent(client, messages, allow_tools=True):
             json={
                 "model": MODEL,
                 "messages": messages,
-                **({"tools": TOOLS, "tool_choice": "auto"} if allow_tools else {"tool_choice": "none"}),
+                "tools": TOOLS,
+                "tool_choice": "auto" if allow_tools else "none",
                 "temperature": 0.2,
                 "max_completion_tokens": (
                     MAX_AGENT_COMPLETION_TOKENS
