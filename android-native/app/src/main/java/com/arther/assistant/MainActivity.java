@@ -63,7 +63,17 @@ public class MainActivity extends BridgeActivity {
         if (artherBridge == null) return;
         if (requestCode == 701 && grantResults.length > 0 &&
             grantResults[0] == PackageManager.PERMISSION_GRANTED) artherBridge.beginListening();
-        if (requestCode == 703 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) artherBridge.beginLocationRequest();
+        if (requestCode == 703) {
+            boolean locationGranted = false;
+            for (int result : grantResults) {
+                if (result == PackageManager.PERMISSION_GRANTED) {
+                    locationGranted = true;
+                    break;
+                }
+            }
+            if (locationGranted) artherBridge.beginLocationRequest();
+            else artherBridge.sendLocationError("لم يتم منح إذن الموقع. اسمح بالموقع التقريبي أو الدقيق ثم أعد المحاولة.");
+        }
         if (requestCode == 702) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
                 artherBridge.applyPendingFlash();
@@ -97,6 +107,8 @@ public class MainActivity extends BridgeActivity {
                 JSONObject c = new JSONObject();
                 c.put("microphone", activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED);
                 c.put("camera", activity.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED);
+                c.put("location", activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                    activity.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED);
                 c.put("writeSettings", Settings.System.canWrite(activity));
                 c.put("accessibility", ArtherAccessibilityService.isEnabled());
                 boolean running = Shizuku.pingBinder();
