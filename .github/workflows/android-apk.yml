@@ -125,6 +125,7 @@ jobs:
                   <package android:name="com.sec.android.app.camera" />
                   <package android:name="com.android.settings" />
                   <package android:name="com.google.android.apps.maps" />
+                  <package android:name="moe.shizuku.privileged.api" />
               </queries>
           """
           if "<queries>" not in s:
@@ -165,6 +166,18 @@ jobs:
 
           if "com.arther.assistant.ArtherAccessibilityService" not in s:
               s = s.replace("</application>", service + "\n</application>")
+
+          provider = """
+              <provider
+                  android:name="rikka.shizuku.ShizukuProvider"
+                  android:authorities="${applicationId}.shizuku"
+                  android:multiprocess="false"
+                  android:enabled="true"
+                  android:exported="true"
+                  android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+          """
+          if "rikka.shizuku.ShizukuProvider" not in s:
+              s = s.replace("</application>", provider + "\n</application>")
 
           p.write_text(s)
           PY
