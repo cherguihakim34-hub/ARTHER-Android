@@ -244,6 +244,16 @@ window.ArtherVoiceResult = function(text) {
   }
 
   const command = words.join(" ").trim();
+  if (/^(stop listening|stop voice|توقف عن الاستماع|اوقف الاستماع|وقف الاستماع|حبس الاستماع|arrete l ecoute|arrete ecoute)$/.test(command)) {
+    wakeWordMode = false;
+    wakeArmed = false;
+    clearTimeout(wakeRestartTimer);
+    clearTimeout(wakeArmTimer);
+    window.ArtherNative?.stopListening?.();
+    speak("تم إيقاف الاستماع الصوتي.");
+    voiceStatus.textContent = "الاستماع متوقف.";
+    return;
+  }
   if (!command) {
     voiceStatus.textContent = "نعم، تفضل...";
     speak("نعم؟");
