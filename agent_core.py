@@ -1451,11 +1451,28 @@ async def run_agent(
             # TOOL EXECUTION
             # ------------------------------------------------
 
+            # Keep the assistant tool-call message consistent with the
+            # responses we will actually append. Providers reject a turn
+            # that declares tool calls without matching tool results.
+            remaining_calls = max(0, MAX_TOOL_CALLS - len(tool_log))
+            calls = calls[:remaining_calls]
+            if isinstance(message, dict) and len(calls) != len(message.get("tool_calls") or []):
+                message = dict(message)
+                message["tool_calls"] = calls
+
+            if not calls:
+                answer = message.get("content") or (
+                    "وصل ARTHER إلى حد التنفيذ المسموح. "
+                    "تم الاحتفاظ بالنتائج المتاحة، ولم يتم تأكيد اكتمال بقية الخطوات."
+                )
+                return await finish_response(
+                    session_id, str(answer), plan=plan, tool_log=tool_log,
+                    rounds=rounds, success=False
+                )
+
             messages.append(message)
 
             for call in calls:
-                if len(tool_log) >= MAX_TOOL_CALLS:
-                    break
 
                 function = call.get("function", {})
                 name = function.get("name", "")
