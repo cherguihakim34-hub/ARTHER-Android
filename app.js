@@ -372,10 +372,12 @@ window.ArtherLocationResult = function(raw) {
   const lat = Number(result.latitude), lon = Number(result.longitude);
   const accuracy = result.accuracy_m == null ? NaN : Number(result.accuracy_m);
   const fixAge = result.fix_age_ms == null ? NaN : Number(result.fix_age_ms);
+  const provider = result.provider === "gps" ? "GPS" : (result.provider === "network" ? "الشبكة" : String(result.provider || ""));
   const message = "تم تحديد موقع الهاتف.\nخط العرض: " + lat.toFixed(6) +
     "\nخط الطول: " + lon.toFixed(6) +
     (Number.isFinite(accuracy) ? "\nدقة تقريبية: " + Math.round(accuracy) + " متر" : "") +
-    (Number.isFinite(fixAge) ? "\nعمر القياس: " + Math.round(fixAge / 1000) + " ثانية" : "");
+    (Number.isFinite(fixAge) ? "\nعمر القياس: " + Math.round(fixAge / 1000) + " ثانية" : "") +
+    (provider ? "\nمصدر الموقع: " + provider : "");
   show(message);
   speak("وجدت موقع هاتفك. أفتح الخريطة الآن.");
   window.ArtherNative?.openMap?.(lat + "," + lon);
