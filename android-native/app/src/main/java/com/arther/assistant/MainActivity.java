@@ -91,6 +91,7 @@ public class MainActivity extends BridgeActivity {
         private String speechLanguageOverride = "auto";
         private boolean ttsReady = false;
         private String pendingSpeech;
+        private boolean forceDefaultRecognitionService = false;
 
         ArtherBridge(MainActivity activity, WebView webView) {
             this.activity = activity;
@@ -324,7 +325,7 @@ public class MainActivity extends BridgeActivity {
                 List<ResolveInfo> recognitionServices = activity.getPackageManager()
                     .queryIntentServices(serviceQuery, PackageManager.MATCH_ALL);
                 for (ResolveInfo info : recognitionServices) {
-                    if (info.serviceInfo != null &&
+                    if (!forceDefaultRecognitionService && info.serviceInfo != null &&
                         "com.google.android.googlequicksearchbox".equals(info.serviceInfo.packageName)) {
                         selectedService = new android.content.ComponentName(
                             info.serviceInfo.packageName, info.serviceInfo.name);
@@ -347,6 +348,7 @@ public class MainActivity extends BridgeActivity {
                     @Override public void onEndOfSpeech() { sendStatus("أحلل كلامك..."); }
                     @Override public void onError(int error) {
                         String reason;
+                        if (error == 11) forceDefaultRecognitionService = true;
                         switch (error) {
                             case SpeechRecognizer.ERROR_AUDIO:
                                 reason = "مشكلة في الميكروفون أو مسار الصوت";
