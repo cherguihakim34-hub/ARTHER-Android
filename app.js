@@ -330,6 +330,27 @@ window.ArtherActionResult = function(accepted, message) {
   if (!accepted && message) speak(message);
 };
 
+
+window.ArtherLocationResult = function(raw) {
+  let result;
+  try { result = typeof raw === "string" ? JSON.parse(raw) : raw; }
+  catch (_) { show("وصل رد GPS بصيغة غير مفهومة."); return; }
+  if (!result || !result.ok) {
+    const message = result?.error || "تعذر تحديد موقع الهاتف.";
+    show(message);
+    speak(message);
+    return;
+  }
+  const lat = Number(result.latitude), lon = Number(result.longitude);
+  const accuracy = Number(result.accuracy_m);
+  const message = "تم تحديد موقع الهاتف.\nخط العرض: " + lat.toFixed(6) +
+    "\nخط الطول: " + lon.toFixed(6) +
+    (Number.isFinite(accuracy) ? "\nدقة تقريبية: " + Math.round(accuracy) + " متر" : "");
+  show(message);
+  speak("وجدت موقع هاتفك. أفتح الخريطة الآن.");
+  window.ArtherNative?.openMap?.(lat + "," + lon);
+};
+
 function detectFlashCommand(prompt) {
   const t = normalizeCommand(prompt);
   const hasFlash = /\b(flash|torch|torche|lampe)\b/.test(t) ||
@@ -445,6 +466,16 @@ function executeLocalCommand(prompt) {
   const sms = text.match(/(?:اكتب رساله|ارسل رساله|ابعث رساله|compose sms|sms)\s+(?:الى|ل|to)?\s*([+\d][\d\s-]{5,})\s+(?:نصها|محتواها|تقول|message)?\s*(.+)/);
   if (sms) {
     window.ArtherNative?.composeSms?.(sms[1].replace(/[\s-]/g, ""), sms[2]);
+    return true;
+  }
+
+  if (/(موقعي الحالي|اين انا|وين راني|حدد موقعي|اعرف موقعي|مكاني الحالي|where am i|my current location|find my location|ma position actuelle|ou suis je)/.test(text)) {
+    if (window.ArtherNative?.getCurrentLocation) {
+      show("جارٍ تحديد موقع الهاتف عبر GPS...");
+      window.ArtherNative.getCurrentLocation();
+    } else {
+      show("ميزة تحديد الموقع غير موجودة في هذه النسخة. حدّث ARTHER.");
+    }
     return true;
   }
   const map = text.match(/(?:افتح خرائط|افتح الخريطه|وجهني الى|اذهب الى|navigate to|maps to)\s+(.+)/);
@@ -670,7 +701,7 @@ if ($("openLocationSettings")) $("openLocationSettings").addEventListener("click
 if ($("openBattery")) $("openBattery").addEventListener("click", () => window.ArtherNative?.openSettings?.("battery"));
 if ($("openAppsSettings")) $("openAppsSettings").addEventListener("click", () => window.ArtherNative?.openSettings?.("apps"));
 if ($("openSystemSettings")) $("openSystemSettings").addEventListener("click", () => window.ArtherNative?.openSettings?.("system"));
-if ($("openMap")) $("openMap").addEventListener("click", () => window.ArtherNative?.openMap?.("موقعي الحالي"));
+if ($("openMap")) $("openMap").addEventListener("click", () => window.ArtherNative?.getCurrentLocation?.());
 if ($("openAlarms")) $("openAlarms").addEventListener("click", () => window.ArtherNative?.showAlarms?.());
 if ($("quickScreenshot")) $("quickScreenshot").addEventListener("click", () => nativeAction("TAKE_SCREENSHOT"));
 if ($("quickNotifications")) $("quickNotifications").addEventListener("click", () => nativeAction("NOTIFICATIONS"));
