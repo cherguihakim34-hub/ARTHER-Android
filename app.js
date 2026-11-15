@@ -703,10 +703,7 @@ if (languageSelect) {
   applySpeechLanguage();
 }
 
-if ($("listen")) $("listen").addEventListener("click", () => {
-  startWakeWordMode();
-  if (window.ArtherNative?.startListening) window.ArtherNative.startListening();
-});
+if ($("listen")) $("listen").addEventListener("click", startWakeWordMode);
 if ($("run")) $("run").addEventListener("click", runArther);
 if ($("clearChat")) $("clearChat").addEventListener("click", clearChat);
 if ($("clearText")) $("clearText").addEventListener("click", () => {
