@@ -6,6 +6,8 @@ import android.net.Uri;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.CancellationSignal;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.AlarmClock;
 import android.provider.CalendarContract;
 import android.provider.Settings;
@@ -865,8 +867,21 @@ public class MainActivity extends BridgeActivity {
                 return;
             }
             String provider = providers.get(index);
+            CancellationSignal cancellation = new CancellationSignal();
+            Handler handler = new Handler(Looper.getMainLooper());
+            boolean[] completed = {false};
+            Runnable timeout = () -> {
+                if (completed[0]) return;
+                completed[0] = true;
+                cancellation.cancel();
+                requestFreshLocation(manager, providers, index + 1);
+            };
+            handler.postDelayed(timeout, 12000L);
             try {
-                manager.getCurrentLocation(provider, new CancellationSignal(), activity.getMainExecutor(), location -> {
+                manager.getCurrentLocation(provider, cancellation, activity.getMainExecutor(), location -> {
+                    if (completed[0]) return;
+                    completed[0] = true;
+                    handler.removeCallbacks(timeout);
                     if (location != null) {
                         long ageMs = locationAgeMillis(location);
                         boolean hasAccuracy = location.hasAccuracy();
@@ -879,12 +894,19 @@ public class MainActivity extends BridgeActivity {
                     requestFreshLocation(manager, providers, index + 1);
                 });
             } catch (SecurityException e) {
-                sendLocationError("إذن الموقع الدقيق غير ممنوح لـ ARTHER.");
+                handler.removeCallbacks(timeout);
+                if (!completed[0]) {
+                    completed[0] = true;
+                    sendLocationError("إذن الموقع الدقيق غير ممنوح لـ ARTHER.");
+                }
             } catch (Exception e) {
-                requestFreshLocation(manager, providers, index + 1);
+                handler.removeCallbacks(timeout);
+                if (!completed[0]) {
+                    completed[0] = true;
+                    requestFreshLocation(manager, providers, index + 1);
+                }
             }
         }
-
         private long locationAgeMillis(Location location) {
             if (location != null && location.getElapsedRealtimeNanos() > 0L) {
                 return Math.max(0L, (android.os.SystemClock.elapsedRealtimeNanos() -
