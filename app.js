@@ -396,7 +396,7 @@ function executeLocalCommand(prompt) {
 
   // Handle compound location requests before the generic "open app" parser.
   // Otherwise "open Google Maps and find my location" is consumed as app launch only.
-  if (/(موقعي الحالي|اين انا|وين راني|حدد موقعي|اعرف موقعي|مكاني الحالي|where am i|my current location|find my location|ma position actuelle|ou suis je)/.test(text)) {
+  if (/(موقعي الحالي|موقع.*(?:gps|جي بي اس).*(?:الحالي|الان)|(?:gps|جي بي اس).*(?:موقعي|موقع الهاتف|position)|موقع الهاتف.*(?:الحالي|الان)|اعطني.*موقع.*(?:الهاتف|هاتف|gps)|اعطيني.*موقع.*(?:الهاتف|هاتف|gps)|اين انا|وين راني|حدد موقعي|اعرف موقعي|مكاني الحالي|where am i|my current location|find my location|ma position actuelle|ou suis je)/.test(text)) {
     if (window.ArtherNative?.getCurrentLocation) {
       show("جارٍ تحديد موقع الهاتف عبر GPS...");
       window.ArtherNative.getCurrentLocation();
