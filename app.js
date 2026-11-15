@@ -276,6 +276,7 @@ window.ArtherCapabilities = function(raw) {
     const c = typeof raw === "string" ? JSON.parse(raw) : raw;
     const lines = [
       "الميكروفون: " + (c.microphone ? "مسموح" : "يحتاج إذناً"),
+      "الموقع: " + (c.location ? "مسموح" : "يحتاج إذناً"),
       "التحكم بالشاشة: " + (c.accessibility ? "مفعّل" : "غير مفعّل"),
       "تعديل السطوع: " + (c.writeSettings ? "مسموح" : "يحتاج إذناً"),
       "Shizuku: " + (!c.shizukuRunning ? "غير مشغّل" : (c.shizukuGranted ? "متصل ومصرّح" : "ينتظر الإذن"))
