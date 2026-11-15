@@ -55,7 +55,7 @@ public class ArtherWakeService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
-        return START_STICKY;
+        return START_NOT_STICKY;
     }
 
     private void createNotificationChannel() {
