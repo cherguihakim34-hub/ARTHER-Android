@@ -88,6 +88,7 @@ public class MainActivity extends BridgeActivity {
         private SpeechRecognizer recognizer;
         private TextToSpeech tts;
         private String pendingFlash;
+        private String speechLanguageOverride = "auto";
 
         ArtherBridge(MainActivity activity, WebView webView) {
             this.activity = activity;
@@ -219,11 +220,31 @@ public class MainActivity extends BridgeActivity {
         }
 
         private String preferredLanguageTag() {
+            if ("fr".equalsIgnoreCase(speechLanguageOverride)) return "fr-FR";
+            if ("en".equalsIgnoreCase(speechLanguageOverride)) return "en-US";
+            if ("ar".equalsIgnoreCase(speechLanguageOverride)) return "ar-SA";
             String language = Locale.getDefault().getLanguage();
             if ("fr".equalsIgnoreCase(language)) return "fr-FR";
             if ("en".equalsIgnoreCase(language)) return "en-US";
             // Use a widely supported Arabic locale; ar-DZ is not available in every recognition service.
             return "ar-SA";
+        }
+
+        @JavascriptInterface
+        public void setSpeechLanguage(String language) {
+            String value = language == null ? "auto" : language.trim().toLowerCase(Locale.ROOT);
+            if (!"ar".equals(value) && !"fr".equals(value) && !"en".equals(value)) value = "auto";
+            final String selected = value;
+            activity.runOnUiThread(() -> {
+                speechLanguageOverride = selected;
+                if (tts != null) {
+                    int result = tts.setLanguage(Locale.forLanguageTag(preferredLanguageTag()));
+                    sendStatus(result == TextToSpeech.LANG_MISSING_DATA ||
+                        result == TextToSpeech.LANG_NOT_SUPPORTED
+                        ? "حزمة صوت اللغة المختارة غير متاحة على الهاتف"
+                        : "تم اختيار لغة الصوت: " + selected);
+                }
+            });
         }
 
         @JavascriptInterface
