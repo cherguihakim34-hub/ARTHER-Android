@@ -99,6 +99,7 @@ public class MainActivity extends BridgeActivity {
                     ttsReady = true;
                     tts.setLanguage(Locale.forLanguageTag(preferredLanguageTag()));
                     tts.setSpeechRate(0.92f);
+                    tts.setPitch(0.82f);
                 }
             });
         }
@@ -240,6 +241,7 @@ public class MainActivity extends BridgeActivity {
             activity.runOnUiThread(() -> {
                 speechLanguageOverride = selected;
                 if (tts != null && ttsReady) {
+                    tts.setPitch(0.82f);
                     int result = tts.setLanguage(Locale.forLanguageTag(preferredLanguageTag()));
                     sendStatus(result == TextToSpeech.LANG_MISSING_DATA ||
                         result == TextToSpeech.LANG_NOT_SUPPORTED
