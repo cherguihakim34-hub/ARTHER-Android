@@ -18,6 +18,7 @@ import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.widget.Toast;
@@ -102,6 +103,19 @@ public class MainActivity extends BridgeActivity {
                     tts.setLanguage(Locale.forLanguageTag(preferredLanguageTag()));
                     tts.setSpeechRate(0.92f);
                     tts.setPitch(0.82f);
+                    tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                        @Override public void onStart(String utteranceId) {}
+                        @Override public void onDone(String utteranceId) {
+                            webView.post(() -> webView.evaluateJavascript(
+                                "if(window.ArtherSpeechFinished){window.ArtherSpeechFinished();}", null
+                            ));
+                        }
+                        @Override public void onError(String utteranceId) {
+                            webView.post(() -> webView.evaluateJavascript(
+                                "if(window.ArtherSpeechFinished){window.ArtherSpeechFinished();}", null
+                            ));
+                        }
+                    });
                     if (pendingSpeech != null && !pendingSpeech.trim().isEmpty()) {
                         String queued = pendingSpeech;
                         pendingSpeech = null;
