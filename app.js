@@ -644,10 +644,14 @@ async function runArther() {
   if ($("run")) $("run").disabled = true;
   connection.textContent = "ARTHER يعالج طلبك...";
 
+  const controller = new AbortController();
+  const requestTimeout = setTimeout(() => controller.abort(), 105000);
+
   try {
     const response = await fetch(API + "/api/agent", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
+      signal: controller.signal,
       body: JSON.stringify({
         prompt,
         language: $("language")?.value || "auto",
@@ -665,11 +669,15 @@ async function runArther() {
     speak(answer);
 
   } catch (error) {
-    addChatMessage("assistant", "تعذر إكمال الطلب: " + error.message);
-    show("خطأ: " + error.message);
+    const message = error.name === "AbortError"
+      ? "انتهت مهلة الطلب. لم يتم تأكيد اكتمال التنفيذ؛ يمكنك إعادة المحاولة."
+      : error.message;
+    addChatMessage("assistant", "تعذر إكمال الطلب: " + message);
+    show("خطأ: " + message);
     connection.textContent = "خطأ في الاتصال";
 
   } finally {
+    clearTimeout(requestTimeout);
     busy = false;
     if ($("run")) $("run").disabled = false;
   }
