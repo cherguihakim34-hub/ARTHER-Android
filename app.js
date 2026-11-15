@@ -393,6 +393,18 @@ function executeLocalCommand(prompt) {
     window.ArtherNative?.openSettings?.("location");
     return true;
   }
+  if (/(افتح اعدادات البطاريه|اعدادات البطاريه|battery settings|parametres batterie)/.test(text)) {
+    window.ArtherNative?.openSettings?.("battery");
+    return true;
+  }
+  if (/(افتح اداره التطبيقات|اعدادات التطبيقات|التطبيقات المثبته|manage apps|app settings|parametres applications)/.test(text)) {
+    window.ArtherNative?.openSettings?.("apps");
+    return true;
+  }
+  if (/(افتح الاعدادات|اعدادات الهاتف|اعدادات الجهاز|system settings|phone settings|parametres du telephone)/.test(text)) {
+    window.ArtherNative?.openSettings?.("system");
+    return true;
+  }
   const brightness = text.match(/(?:سطوع|اضاءه الشاشه|سطع الشاشه|brightness|luminosite).*?(\d{1,3})\s*%?/);
   if (brightness) {
     const level = Math.max(1, Math.min(100, Number(brightness[1])));
@@ -651,6 +663,13 @@ if ($("back")) $("back").addEventListener("click", () => nativeAction("BACK"));
 if ($("scrollDown")) $("scrollDown").addEventListener("click", () => nativeAction("SCROLL_DOWN"));
 if ($("openCamera")) $("openCamera").addEventListener("click", () => window.ArtherNative?.openCamera?.());
 if ($("openWifi")) $("openWifi").addEventListener("click", () => window.ArtherNative?.openSettings?.("wifi"));
+if ($("openBluetooth")) $("openBluetooth").addEventListener("click", () => window.ArtherNative?.openSettings?.("bluetooth"));
+if ($("openDisplay")) $("openDisplay").addEventListener("click", () => window.ArtherNative?.openSettings?.("display"));
+if ($("openSound")) $("openSound").addEventListener("click", () => window.ArtherNative?.openSettings?.("sound"));
+if ($("openLocationSettings")) $("openLocationSettings").addEventListener("click", () => window.ArtherNative?.openSettings?.("location"));
+if ($("openBattery")) $("openBattery").addEventListener("click", () => window.ArtherNative?.openSettings?.("battery"));
+if ($("openAppsSettings")) $("openAppsSettings").addEventListener("click", () => window.ArtherNative?.openSettings?.("apps"));
+if ($("openSystemSettings")) $("openSystemSettings").addEventListener("click", () => window.ArtherNative?.openSettings?.("system"));
 if ($("openMap")) $("openMap").addEventListener("click", () => window.ArtherNative?.openMap?.("موقعي الحالي"));
 if ($("openAlarms")) $("openAlarms").addEventListener("click", () => window.ArtherNative?.showAlarms?.());
 if ($("quickScreenshot")) $("quickScreenshot").addEventListener("click", () => nativeAction("TAKE_SCREENSHOT"));
