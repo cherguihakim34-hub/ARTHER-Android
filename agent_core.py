@@ -1391,7 +1391,8 @@ async def run_agent(
 
     async with httpx.AsyncClient(timeout=90) as client:
 
-        # Reserve one final model turn to synthesize evidence after tool execution.\n    for round_number in range(MAX_TOOL_ROUNDS + 1):
+        # Reserve one final model turn to synthesize evidence after tool execution.
+        for round_number in range(MAX_TOOL_ROUNDS + 1):
             rounds = round_number + 1
 
             try:
