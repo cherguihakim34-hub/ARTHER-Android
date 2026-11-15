@@ -347,7 +347,7 @@ window.ArtherLocationResult = function(raw) {
     return;
   }
   const lat = Number(result.latitude), lon = Number(result.longitude);
-  const accuracy = Number(result.accuracy_m);
+  const accuracy = result.accuracy_m == null ? NaN : Number(result.accuracy_m);
   const message = "تم تحديد موقع الهاتف.\nخط العرض: " + lat.toFixed(6) +
     "\nخط الطول: " + lon.toFixed(6) +
     (Number.isFinite(accuracy) ? "\nدقة تقريبية: " + Math.round(accuracy) + " متر" : "");
