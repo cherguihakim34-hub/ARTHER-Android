@@ -152,6 +152,7 @@ jobs:
               '<uses-permission android:name="android.permission.RECORD_AUDIO" />',
               '<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />',
               '<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />',
+              '<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />',
               '<uses-permission android:name="android.permission.CAMERA" />',
               '<uses-permission android:name="android.permission.WRITE_SETTINGS" />',
               '<uses-permission android:name="android.permission.FLASHLIGHT" />',
@@ -207,6 +208,7 @@ jobs:
 
           assert "android.permission.FOREGROUND_SERVICE" in s
           assert "android.permission.FOREGROUND_SERVICE_MICROPHONE" in s
+          assert "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" in s
           assert "com.arther.assistant.ArtherWakeService" in s
           assert "android.permission.ACCESS_FINE_LOCATION" in s
           assert "android.permission.ACCESS_COARSE_LOCATION" in s
