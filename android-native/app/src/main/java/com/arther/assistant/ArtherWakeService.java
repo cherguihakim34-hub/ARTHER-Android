@@ -13,6 +13,7 @@ import android.os.IBinder;
 public class ArtherWakeService extends Service {
     private static final String CHANNEL_ID = "arther_voice_service";
     private static final int NOTIFICATION_ID = 11901;
+    public static volatile boolean isRunning = false;
 
     @Override
     public void onCreate() {
@@ -51,7 +52,9 @@ public class ArtherWakeService extends Service {
             } else {
                 startForeground(NOTIFICATION_ID, notification);
             }
+            isRunning = true;
         } catch (SecurityException | IllegalStateException error) {
+            isRunning = false;
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -71,6 +74,11 @@ public class ArtherWakeService extends Service {
         }
     }
 
+    @Override
+    public void onDestroy() {
+        isRunning = false;
+        super.onDestroy();
+    }
     @Override
     public IBinder onBind(Intent intent) {
         return null;
