@@ -119,7 +119,10 @@ public class MainActivity extends BridgeActivity {
                 c.put("camera", activity.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED);
                 c.put("location", activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                     activity.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED);
-                c.put("writeSettings", Settings.System.canWrite(activity));
+                c.put("writeSettings", Settings.System.canWrite(activity));                android.os.PowerManager power = (android.os.PowerManager)
+                    activity.getSystemService(android.content.Context.POWER_SERVICE);
+                c.put("batteryOptimizationIgnored", android.os.Build.VERSION.SDK_INT < 23 ||
+                    (power != null && power.isIgnoringBatteryOptimizations(activity.getPackageName())));
                 c.put("accessibility", ArtherAccessibilityService.isEnabled());
                 boolean running = Shizuku.pingBinder();
                 c.put("shizukuRunning", running);
@@ -689,6 +692,29 @@ public class MainActivity extends BridgeActivity {
 
 
 
+        @JavascriptInterface
+        public void requestBackgroundPermission() {
+            activity.runOnUiThread(() -> {
+                try {
+                    if (android.os.Build.VERSION.SDK_INT < 23) {
+                        appStatus(true, "لا تنطبق قيود تحسين البطارية على هذا الإصدار");
+                        return;
+                    }
+                    android.os.PowerManager power = (android.os.PowerManager)
+                        activity.getSystemService(android.content.Context.POWER_SERVICE);
+                    if (power != null && power.isIgnoringBatteryOptimizations(activity.getPackageName())) {
+                        appStatus(true, "السماح بالعمل في الخلفية مفعّل بالفعل");
+                        getCapabilities();
+                        return;
+                    }
+                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:" + activity.getPackageName()));
+                    activity.startActivity(intent);
+                } catch (Exception error) {
+                    appStatus(false, "تعذر فتح إعدادات تحسين البطارية؛ اضبط بطارية ARTHER على غير مقيّد يدوياً");
+                }
+            });
+        }
         @JavascriptInterface
         public void requestBrightnessPermission() {
             activity.runOnUiThread(() -> {
