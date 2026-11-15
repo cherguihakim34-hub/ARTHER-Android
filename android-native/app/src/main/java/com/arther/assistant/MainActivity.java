@@ -305,6 +305,10 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public boolean isVoiceServiceRunning() {
+            return ArtherWakeService.isRunning;
+        }
+        @JavascriptInterface
         public void stopListening() {
             activity.runOnUiThread(() -> {
                 try {
