@@ -90,6 +90,7 @@ public class MainActivity extends BridgeActivity {
         private String pendingFlash;
         private String speechLanguageOverride = "auto";
         private boolean ttsReady = false;
+        private String pendingSpeech;
 
         ArtherBridge(MainActivity activity, WebView webView) {
             this.activity = activity;
@@ -100,6 +101,11 @@ public class MainActivity extends BridgeActivity {
                     tts.setLanguage(Locale.forLanguageTag(preferredLanguageTag()));
                     tts.setSpeechRate(0.92f);
                     tts.setPitch(0.82f);
+                    if (pendingSpeech != null && !pendingSpeech.trim().isEmpty()) {
+                        String queued = pendingSpeech;
+                        pendingSpeech = null;
+                        tts.speak(queued, TextToSpeech.QUEUE_FLUSH, null, "ARTHER_REPLY");
+                    }
                 }
             });
         }
@@ -523,14 +529,19 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public void speak(String text) {
             activity.runOnUiThread(() -> {
-                if (tts != null && text != null)
+                if (text == null || text.trim().isEmpty()) return;
+                if (tts != null && ttsReady) {
+                    pendingSpeech = null;
                     tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ARTHER_REPLY");
+                } else {
+                    pendingSpeech = text;
+                }
             });
         }
 
         @JavascriptInterface
         public void stopSpeaking() {
-            activity.runOnUiThread(() -> { if (tts != null) tts.stop(); });
+            activity.runOnUiThread(() -> { pendingSpeech = null; if (tts != null) tts.stop(); });
         }
 
         @JavascriptInterface
