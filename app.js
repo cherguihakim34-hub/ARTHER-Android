@@ -147,10 +147,14 @@ function speak(message) {
 }
 
 function preferredSpeechLanguage() {
+  const choice = $("language")?.value || "auto";
+  if (choice === "fr") return "fr-FR";
+  if (choice === "en") return "en-US";
+  if (choice === "ar") return "ar-SA";
   const language = String(navigator.language || "ar-DZ").toLowerCase();
   if (language.startsWith("fr")) return "fr-FR";
   if (language.startsWith("en")) return "en-US";
-  return "ar-DZ";
+  return "ar-SA";
 }
 
 function listen() {
@@ -646,7 +650,7 @@ async function runArther() {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
         prompt,
-        language: "auto",
+        language: $("language")?.value || "auto",
         session_id: SESSION_ID
       })
     });
@@ -669,6 +673,20 @@ async function runArther() {
     busy = false;
     if ($("run")) $("run").disabled = false;
   }
+}
+
+const languageSelect = $("language");
+if (languageSelect) {
+  try {
+    const savedLanguage = localStorage.getItem("arther_language");
+    if (["auto", "ar", "fr", "en"].includes(savedLanguage)) languageSelect.value = savedLanguage;
+  } catch (_) {}
+  const applySpeechLanguage = () => {
+    try { localStorage.setItem("arther_language", languageSelect.value); } catch (_) {}
+    window.ArtherNative?.setSpeechLanguage?.(languageSelect.value);
+  };
+  languageSelect.addEventListener("change", applySpeechLanguage);
+  applySpeechLanguage();
 }
 
 if ($("listen")) $("listen").addEventListener("click", startWakeWordMode);
