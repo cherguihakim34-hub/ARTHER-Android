@@ -345,3 +345,23 @@ footer { margin-top: 36px; }
 
 .tool-actions { display: grid !important; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin-top: 9px; }
 .tool-actions button { min-height: 42px; }
+
+
+/* Explicit language selection for speech recognition and speech output */
+.workspace #language {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  margin: 0 0 14px;
+  padding: 10px 13px;
+  border: 1px solid #31586a;
+  border-radius: 12px;
+  background: #071522;
+  color: var(--text);
+  font: 15px Arial, sans-serif;
+}
+.workspace #language:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px #58d9d120;
+}
