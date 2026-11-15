@@ -679,11 +679,24 @@ async function runArther() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "فشل الاتصال بالخادم");
 
-    const answer = data.answer || "لم يصل رد من الخادم.";
-    addChatMessage("assistant", answer);
-    show(answer);
+    const answer = data.answer || "لم يصل رد من الخادم."; 
+    let displayAnswer = answer;
+    const calls = Array.isArray(data.tool_calls) ? data.tool_calls : [];
+    const verification = data.verification || {};
+    if (calls.length) {
+      const successful = calls.filter(item => item?.result?.ok === true).length;
+      const failed = calls.length - successful;
+      const statusLabels = {completed: "مكتمل بالأدلة", partial: "جزئي", blocked: "متعذر", unverified: "غير متحقق"};
+      const status = statusLabels[verification.status] || "غير متحقق";
+      displayAnswer += "\n\nحالة التنفيذ: " + status +
+        " · عمليات ناجحة: " + successful +
+        " · عمليات فاشلة: " + failed;
+      if (verification.note) displayAnswer += "\n" + String(verification.note).slice(0, 450);
+    }
+    addChatMessage("assistant", displayAnswer);
+    show(displayAnswer);
     connection.textContent = "متصل";
-    speak(answer);
+    speak(displayAnswer);
 
   } catch (error) {
     const message = error.name === "AbortError"
