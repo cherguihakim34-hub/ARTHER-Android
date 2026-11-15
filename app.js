@@ -684,6 +684,7 @@ if (languageSelect) {
   const applySpeechLanguage = () => {
     try { localStorage.setItem("arther_language", languageSelect.value); } catch (_) {}
     window.ArtherNative?.setSpeechLanguage?.(languageSelect.value);
+    if (wakeWordMode) scheduleWakeListening(250);
   };
   languageSelect.addEventListener("change", applySpeechLanguage);
   applySpeechLanguage();
