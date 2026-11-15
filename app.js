@@ -703,7 +703,10 @@ if (languageSelect) {
   applySpeechLanguage();
 }
 
-if ($("listen")) $("listen").addEventListener("click", startWakeWordMode);
+if ($("listen")) $("listen").addEventListener("click", () => {
+  startWakeWordMode();
+  if (window.ArtherNative?.startListening) window.ArtherNative.startListening();
+});
 if ($("run")) $("run").addEventListener("click", runArther);
 if ($("clearChat")) $("clearChat").addEventListener("click", clearChat);
 if ($("clearText")) $("clearText").addEventListener("click", () => {
@@ -718,8 +721,14 @@ if (question) question.addEventListener("keydown", event => {
 });
 
 if ($("stopVoice")) $("stopVoice").addEventListener("click", () => {
+  wakeWordMode = false;
+  wakeArmed = false;
+  clearTimeout(wakeRestartTimer);
+  clearTimeout(wakeArmTimer);
   window.ArtherNative?.stopSpeaking?.();
+  window.ArtherNative?.stopListening?.();
   if ("speechSynthesis" in window) speechSynthesis.cancel();
+  if (voiceStatus) voiceStatus.textContent = "تم إيقاف الاستماع. اضغط استمع إليّ لإعادة تشغيله.";
 });
 
 if ($("home")) $("home").addEventListener("click", () => nativeAction("HOME"));
