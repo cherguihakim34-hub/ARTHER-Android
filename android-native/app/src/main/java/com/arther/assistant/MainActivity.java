@@ -611,12 +611,24 @@ public class MainActivity extends BridgeActivity {
                         {"facebook", "فيسبوك", "فايسبوك"},
                         {"camera", "كاميرا", "الكاميرا"},
                         {"settings", "اعدادات", "الاعدادات", "بارامتر"},
-                        {"maps", "خرائط", "الخريطة", "خرائط جوجل"}
+                        {"maps", "خرائط", "الخريطة", "خرائط جوجل"},
+                        {"phone", "هاتف", "اتصال", "dialer", "telephone"},
+                        {"messages", "رسائل", "الرسائل", "sms", "messagerie"},
+                        {"gallery", "معرض", "الصور", "photos", "galerie"},
+                        {"clock", "ساعة", "الساعة", "horloge", "alarm"},
+                        {"files", "ملفاتي", "الملفات", "my files", "fichiers"},
+                        {"calculator", "آلة حاسبة", "الحاسبة", "calculatrice"},
+                        {"play store", "متجر بلاي", "بلاي ستور", "playstore"},
+                        {"gmail", "جيميل", "بريد جوجل", "mail"}
                     };
                     String[] packages = {
                         "com.google.android.youtube", "com.android.chrome", "com.whatsapp",
                         "com.facebook.katana", "com.sec.android.app.camera",
-                        "com.android.settings", "com.google.android.apps.maps"
+                        "com.android.settings", "com.google.android.apps.maps",
+                        "com.samsung.android.dialer", "com.samsung.android.messaging",
+                        "com.sec.android.gallery3d", "com.sec.android.app.clockpackage",
+                        "com.sec.android.app.myfiles", "com.sec.android.app.popupcalculator",
+                        "com.android.vending", "com.google.android.gm"
                     };
                     for (int i = 0; i < known.length; i++) {
                         boolean match = false;
