@@ -2,6 +2,7 @@ package com.arther.assistant;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.Context;
 import android.net.Uri;
 import android.location.Location;
 import android.location.LocationManager;
@@ -259,7 +260,35 @@ public class MainActivity extends BridgeActivity {
                     activity.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 701);
                     return;
                 }
+                startWakeService();
                 beginListening();
+            });
+        }
+
+        private void startWakeService() {
+            try {
+                Intent service = new Intent(activity, ArtherWakeService.class);
+                if (android.os.Build.VERSION.SDK_INT >= 26) activity.startForegroundService(service);
+                else activity.startService(service);
+            } catch (Exception error) {
+                sendStatus("تعذر تشغيل خدمة الاستعداد الصوتي: " + error.getClass().getSimpleName());
+            }
+        }
+
+        @JavascriptInterface
+        public void stopListening() {
+            activity.runOnUiThread(() -> {
+                try {
+                    if (recognizer != null) {
+                        recognizer.cancel();
+                        recognizer.destroy();
+                        recognizer = null;
+                    }
+                    activity.stopService(new Intent(activity, ArtherWakeService.class));
+                    sendStatus("تم إيقاف الاستماع الصوتي");
+                } catch (Exception error) {
+                    sendStatus("تعذر إيقاف الاستماع الصوتي");
+                }
             });
         }
 
