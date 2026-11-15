@@ -320,11 +320,19 @@ public class MainActivity extends BridgeActivity {
                         sendStatus("تعذر سماع الأمر: " + reason + " (رمز " + error + ")");
                     }
                     @Override public void onResults(Bundle results) {
-                        ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                        if (matches != null && !matches.isEmpty()) {
-                            String safe = JSONObject.quote(matches.get(0));
-                            webView.post(() -> webView.evaluateJavascript("window.ArtherVoiceResult(" + safe + ")", null));
-                        }
+                        ArrayList<String> matches = results == null
+                            ? null
+                            : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                        // Always notify the web app. An empty recognition result must
+                        // re-arm foreground wake-word listening instead of leaving it stuck.
+                        String transcript = matches != null && !matches.isEmpty()
+                            ? matches.get(0)
+                            : "";
+                        String safe = JSONObject.quote(transcript);
+                        webView.post(() -> webView.evaluateJavascript(
+                            "if(window.ArtherVoiceResult){window.ArtherVoiceResult(" + safe + ");}",
+                            null
+                        ));
                     }
                     @Override public void onPartialResults(Bundle b) {}
                     @Override public void onEvent(int e, Bundle b) {}
