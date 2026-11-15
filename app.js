@@ -283,6 +283,7 @@ window.ArtherCapabilities = function(raw) {
       "الموقع: " + (c.location ? "مسموح" : "يحتاج إذناً"),
       "التحكم بالشاشة: " + (c.accessibility ? "مفعّل" : "غير مفعّل"),
       "تعديل السطوع: " + (c.writeSettings ? "مسموح" : "يحتاج إذناً"),
+      "العمل في الخلفية: " + (c.batteryOptimizationIgnored ? "مسموح" : "قد توقفه البطارية"),
       "Shizuku: " + (!c.shizukuRunning ? "غير مشغّل" : (c.shizukuGranted ? "متصل ومصرّح" : "ينتظر الإذن"))
     ];
     el.textContent = lines.join(" · ");
@@ -748,6 +749,11 @@ if ($("quickLock")) $("quickLock").addEventListener("click", () => nativeAction(
 if ($("quickVolumeUp")) $("quickVolumeUp").addEventListener("click", () => window.ArtherNative?.controlVolume?.("UP"));
 if ($("quickVolumeDown")) $("quickVolumeDown").addEventListener("click", () => window.ArtherNative?.controlVolume?.("DOWN"));
 if ($("requestBrightness")) $("requestBrightness").addEventListener("click", () => window.ArtherNative?.requestBrightnessPermission?.());
+
+if ($("requestBackground")) $("requestBackground").addEventListener("click", () => {
+  if (window.ArtherNative?.requestBackgroundPermission) window.ArtherNative.requestBackgroundPermission();
+  else show("إعداد الخلفية غير متاح في هذه النسخة.");
+});
 
 if ($("requestMic")) $("requestMic").addEventListener("click", () => {
   if (window.ArtherNative?.requestMicrophonePermission) {
