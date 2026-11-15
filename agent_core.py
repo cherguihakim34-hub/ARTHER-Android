@@ -1006,7 +1006,7 @@ async def call_tool(name, arguments):
 # AI PROVIDER REQUEST
 # ============================================================
 
-async def ask_agent(client, messages):
+async def ask_agent(client, messages, allow_tools=True):
     try:
         response = await client.post(
             f"{BASE_URL}/chat/completions",
@@ -1017,8 +1017,7 @@ async def ask_agent(client, messages):
             json={
                 "model": MODEL,
                 "messages": messages,
-                "tools": TOOLS,
-                "tool_choice": "auto",
+                **({"tools": TOOLS, "tool_choice": "auto"} if allow_tools else {"tool_choice": "none"}),
                 "temperature": 0.2,
                 "max_completion_tokens": (
                     MAX_AGENT_COMPLETION_TOKENS
@@ -1182,6 +1181,9 @@ async def finish_response(
             verification["status"] = "partial"
         else:
             verification["status"] = "blocked"
+
+    if tool_log and verification.get("status") != "completed":
+        success = False
 
     await save_message(
         session_id,
@@ -1389,13 +1391,15 @@ async def run_agent(
 
     async with httpx.AsyncClient(timeout=90) as client:
 
-        for round_number in range(MAX_TOOL_ROUNDS):
+        # Reserve one final model turn to synthesize evidence after tool execution.\n    for round_number in range(MAX_TOOL_ROUNDS + 1):
             rounds = round_number + 1
 
             try:
+                allow_tools = (round_number < MAX_TOOL_ROUNDS and len(tool_log) < MAX_TOOL_CALLS)
                 message = await ask_agent(
                     client,
-                    messages
+                    messages,
+                    allow_tools=allow_tools
                 )
 
             except AIProviderError as exc:
@@ -1415,6 +1419,11 @@ async def run_agent(
                 )
 
             calls = message.get("tool_calls") or []
+
+            # The final turn is deliberately tool-free: summarize the evidence
+            # already collected and clearly state anything that remains undone.
+            if not allow_tools and calls:
+                calls = []
 
             # ------------------------------------------------
             # FINAL ANSWER
@@ -1483,17 +1492,16 @@ async def run_agent(
                     "content": compact_tool_result(result)
                 })
 
-            if len(tool_log) >= MAX_TOOL_CALLS:
-                break
+            # If the tool budget was reached, the next iteration is the
+            # reserved synthesis turn; do not discard the collected evidence.
 
     # --------------------------------------------------------
-    # MAXIMUM ROUNDS OR TOOL LIMIT
+    # FALLBACK: PROVIDER DID NOT PRODUCE A FINAL SYNTHESIS
     # --------------------------------------------------------
 
     answer = (
-        "وصل ARTHER إلى الحد الأقصى للتنفيذ. "
-        "تم تسجيل نتائج الأدوات، لكن لم يتم التأكد "
-        "من اكتمال جميع أجزاء الطلب."
+        "توقف التنفيذ قبل اكتمال جميع الخطوات. "
+        "هذه نتائج جزئية، ولم يتم تأكيد اكتمال المهمة."
     )
 
     return await finish_response(
