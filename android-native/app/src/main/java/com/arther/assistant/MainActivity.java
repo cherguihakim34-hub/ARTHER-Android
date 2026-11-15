@@ -114,6 +114,7 @@ public class MainActivity extends BridgeActivity {
                 boolean running = Shizuku.pingBinder();
                 c.put("shizukuRunning", running);
                 c.put("shizukuGranted", running && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED);
+                c.put("shizukuUid", running ? Shizuku.getUid() : -1);
                 String safe = JSONObject.quote(c.toString());
                 webView.post(() -> webView.evaluateJavascript(
                     "if(window.ArtherCapabilities){window.ArtherCapabilities(" + safe + ");}", null
@@ -151,8 +152,10 @@ public class MainActivity extends BridgeActivity {
         public void shizukuStatus() {
             boolean running = Shizuku.pingBinder();
             boolean granted = running && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
+            int uid = running ? Shizuku.getUid() : -1;
+            String mode = uid == 0 ? "صلاحيات Root" : (uid == 2000 ? "صلاحيات ADB / Shell" : "صلاحيات Shizuku");
             reportShizuku(granted, !running ? "Shizuku غير مشغّل" :
-                (granted ? "Shizuku متصل ومصرّح" : "Shizuku يعمل، بانتظار منح الصلاحية"));
+                (granted ? "Shizuku متصل ومصرّح — " + mode : "Shizuku يعمل، بانتظار منح الصلاحية — " + mode));
         }
 
         @JavascriptInterface
