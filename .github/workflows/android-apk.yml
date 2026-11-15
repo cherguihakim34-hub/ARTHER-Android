@@ -36,6 +36,9 @@ jobs:
       - name: Validate JavaScript
         run: node --check app.js
 
+      - name: Validate backend Python
+        run: python -m py_compile main.py agent_core.py memory_store.py planner.py
+
       - name: Configure Capacitor
         run: |
           cat > capacitor.config.json <<'EOF'
