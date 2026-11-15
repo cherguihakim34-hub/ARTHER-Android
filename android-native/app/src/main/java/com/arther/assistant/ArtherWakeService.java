@@ -29,7 +29,10 @@ public class ArtherWakeService extends Service {
                 this, 119, openApp,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
-            Notification notification = new Notification.Builder(this, CHANNEL_ID)
+            Notification.Builder builder = Build.VERSION.SDK_INT >= 26
+                ? new Notification.Builder(this, CHANNEL_ID)
+                : new Notification.Builder(this);
+            Notification notification = builder
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
                 .setContentTitle("ARTHER يستمع")
                 .setContentText("خدمة الاستعداد الصوتي مفعّلة. اضغط للعودة إلى ARTHER.")
