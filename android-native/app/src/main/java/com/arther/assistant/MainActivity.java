@@ -908,14 +908,15 @@ public class MainActivity extends BridgeActivity {
             }
         }
         private long locationAgeMillis(Location location) {
-            if (location != null && location.getElapsedRealtimeNanos() > 0L) {
-                return Math.max(0L, (android.os.SystemClock.elapsedRealtimeNanos() -
-                    location.getElapsedRealtimeNanos()) / 1000000L);
+            if (location == null) return Long.MAX_VALUE;
+            if (location.getElapsedRealtimeNanos() > 0L) {
+                long delta = android.os.SystemClock.elapsedRealtimeNanos() -
+                    location.getElapsedRealtimeNanos();
+                return delta < 0L ? Long.MAX_VALUE : delta / 1000000L;
             }
-            return location == null ? Long.MAX_VALUE :
-                Math.max(0L, System.currentTimeMillis() - location.getTime());
+            long wallClockDelta = System.currentTimeMillis() - location.getTime();
+            return wallClockDelta < 0L ? Long.MAX_VALUE : wallClockDelta;
         }
-
         private void reportLocation(Location location) {
             try {
                 JSONObject data = new JSONObject();
