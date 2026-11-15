@@ -699,7 +699,7 @@ async function runArther() {
     if (calls.length) {
       const successful = calls.filter(item => item?.result?.ok === true).length;
       const failed = calls.length - successful;
-      const statusLabels = {completed: "مكتمل بالأدلة", partial: "جزئي", blocked: "متعذر", unverified: "غير متحقق"};
+      const statusLabels = {completed: "كل العمليات المسجلة نجحت", partial: "جزئي", blocked: "متعذر", unverified: "غير متحقق"};
       const status = statusLabels[verification.status] || "غير متحقق";
       displayAnswer += "\n\nحالة التنفيذ: " + status +
         " · عمليات ناجحة: " + successful +
