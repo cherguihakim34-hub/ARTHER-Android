@@ -421,7 +421,7 @@ function isDeviceInfoRequest(prompt) {
 function executeLocalCommand(prompt) {
   const text = normalizeCommand(prompt);
 
-  if (/(التطبيقات المثبته|التطبيقات الموجودة|اعرض التطبيقات|قائمه التطبيقات|قائمة التطبيقات|list installed apps|show installed apps|mes applications installees)/.test(text)) {
+  if (/(التطبيقات المثبته|التطبيقات المثبتة|التطبيقات الموجوده|التطبيقات الموجودة|اعرض التطبيقات|قائمه التطبيقات|قائمة التطبيقات|list installed apps|show installed apps|mes applications installees)/.test(text)) {
     try {
       const rawApps = window.ArtherNative?.getInstalledApps?.() || "[]";
       const apps = JSON.parse(rawApps);
