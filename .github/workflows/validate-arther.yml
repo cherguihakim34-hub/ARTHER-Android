@@ -41,7 +41,7 @@ jobs:
               Path("android-native/app/src/main/res/values/arther_strings.xml"),
           ]
           for path in files:
-              ET.parse(path)
+              ET.fromstring(path.read_text(encoding="utf-8-sig").lstrip())
               print("XML OK:", path)
 
           manifest = files[0].read_text()
