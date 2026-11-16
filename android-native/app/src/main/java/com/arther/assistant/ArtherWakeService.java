@@ -37,8 +37,8 @@ public class ArtherWakeService extends Service {
                 : new Notification.Builder(this);
             Notification notification = builder
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-                .setContentTitle("ARTHER يستمع")
-                .setContentText("خدمة الاستعداد الصوتي مفعّلة. اضغط للعودة إلى ARTHER.")
+                .setContentTitle("ARTHER · وضع الاستعداد الصوتي")
+                .setContentText("خدمة الخلفية نشطة؛ قد يتوقف التعرف إذا أوقف Android جلسة الصوت.")
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .setCategory(Notification.CATEGORY_SERVICE)
