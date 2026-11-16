@@ -28,6 +28,8 @@ import android.widget.Toast;
 import com.getcapacitor.BridgeActivity;
 import rikka.shizuku.Shizuku;
 import org.json.JSONObject;
+import org.json.JSONArray;
+import java.util.Collections;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -621,6 +623,33 @@ public class MainActivity extends BridgeActivity {
             for (String part : wantedParts) if (part.length() > 1 && labelParts.contains(part)) hits++;
             if (hits == 0) return 0;
             return 40 + (hits * 50 / Math.max(1, wantedParts.length));
+        }
+
+        @JavascriptInterface
+        public String getInstalledApps() {
+            try {
+                PackageManager pm = activity.getPackageManager();
+                Intent query = new Intent(Intent.ACTION_MAIN);
+                query.addCategory(Intent.CATEGORY_LAUNCHER);
+                List<ResolveInfo> matches = pm.queryIntentActivities(query, PackageManager.MATCH_ALL);
+                Set<String> labels = new HashSet<>();
+                for (ResolveInfo info : matches) {
+                    if (info == null || info.activityInfo == null) continue;
+                    CharSequence label = info.loadLabel(pm);
+                    if (label != null && !label.toString().trim().isEmpty()) {
+                        labels.add(label.toString().trim());
+                    }
+                }
+                List<String> sorted = new ArrayList<>(labels);
+                Collections.sort(sorted, String.CASE_INSENSITIVE_ORDER);
+                JSONArray result = new JSONArray();
+                for (int i = 0; i < Math.min(sorted.size(), 120); i++) {
+                    result.put(sorted.get(i));
+                }
+                return result.toString();
+            } catch (Exception error) {
+                return "[]";
+            }
         }
 
         @JavascriptInterface
