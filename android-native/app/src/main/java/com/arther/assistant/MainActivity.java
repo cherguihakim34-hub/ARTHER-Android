@@ -66,8 +66,13 @@ public class MainActivity extends BridgeActivity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (artherBridge == null) return;
-        if (requestCode == 701 && grantResults.length > 0 &&
-            grantResults[0] == PackageManager.PERMISSION_GRANTED) artherBridge.startListening();
+        if (requestCode == 701) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                artherBridge.startListening();
+            } else {
+                artherBridge.sendStatus("لم تمنح إذن الميكروفون؛ لن يبدأ الاستماع حتى تسمح به.");
+            }
+        }
         if (requestCode == 703) {
             boolean locationGranted = false;
             for (int result : grantResults) {
