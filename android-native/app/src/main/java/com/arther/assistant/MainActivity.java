@@ -134,8 +134,10 @@ public class MainActivity extends BridgeActivity {
                 JSONObject c = new JSONObject();
                 c.put("microphone", activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED);
                 c.put("camera", activity.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED);
-                c.put("location", activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                    activity.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED);
+                boolean preciseLocation = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                boolean approximateLocation = activity.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                c.put("location", preciseLocation || approximateLocation);
+                c.put("locationPrecise", preciseLocation);
                 c.put("writeSettings", Settings.System.canWrite(activity));
                 android.os.PowerManager power = (android.os.PowerManager)
                     activity.getSystemService(android.content.Context.POWER_SERVICE);
