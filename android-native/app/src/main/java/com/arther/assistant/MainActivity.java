@@ -311,16 +311,21 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public void stopListening() {
             activity.runOnUiThread(() -> {
+                // Stop the Android service even if the speech provider throws while
+                // cancelling its current recognition session.
+                SpeechRecognizer current = recognizer;
+                recognizer = null;
+                if (current != null) {
+                    try { current.cancel(); } catch (Exception ignored) {}
+                    try { current.destroy(); } catch (Exception ignored) {}
+                }
                 try {
-                    if (recognizer != null) {
-                        recognizer.cancel();
-                        recognizer.destroy();
-                        recognizer = null;
-                    }
                     activity.stopService(new Intent(activity, ArtherWakeService.class));
+                    getCapabilities();
                     sendStatus("تم إيقاف الاستماع الصوتي");
                 } catch (Exception error) {
-                    sendStatus("تعذر إيقاف الاستماع الصوتي");
+                    sendStatus("أوقفت محرك الصوت، لكن تعذر إيقاف خدمة الخلفية: " +
+                        error.getClass().getSimpleName());
                 }
             });
         }
