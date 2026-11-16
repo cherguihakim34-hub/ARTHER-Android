@@ -810,6 +810,7 @@ if ($("openBattery")) $("openBattery").addEventListener("click", () => window.Ar
 if ($("openAppsSettings")) $("openAppsSettings").addEventListener("click", () => window.ArtherNative?.openSettings?.("apps"));
 if ($("openSystemSettings")) $("openSystemSettings").addEventListener("click", () => window.ArtherNative?.openSettings?.("system"));
 if ($("openMap")) $("openMap").addEventListener("click", () => window.ArtherNative?.getCurrentLocation?.());
+if ($("listApps")) $("listApps").addEventListener("click", () => executeLocalCommand("اعرض التطبيقات المثبتة"));
 if ($("openAlarms")) $("openAlarms").addEventListener("click", () => window.ArtherNative?.showAlarms?.());
 if ($("quickScreenshot")) $("quickScreenshot").addEventListener("click", () => nativeAction("TAKE_SCREENSHOT"));
 if ($("quickNotifications")) $("quickNotifications").addEventListener("click", () => nativeAction("NOTIFICATIONS"));
