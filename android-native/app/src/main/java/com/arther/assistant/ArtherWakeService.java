@@ -73,8 +73,9 @@ public class ArtherWakeService extends Service {
                 wakeLock.setReferenceCounted(false);
             }
             if (!wakeLock.isHeld()) {
-                // Bound the lock as a safety net; the service releases it on shutdown.
-                wakeLock.acquire(12L * 60L * 60L * 1000L);
+                // Hold CPU awake only while the user-enabled foreground voice service runs.
+                // Android releases the lock if the process is killed; onDestroy releases it normally.
+                wakeLock.acquire();
             }
         } catch (Exception ignored) {}
     }
