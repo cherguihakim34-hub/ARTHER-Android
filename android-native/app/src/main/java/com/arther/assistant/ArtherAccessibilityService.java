@@ -232,8 +232,9 @@ public class ArtherAccessibilityService extends AccessibilityService {
             }
 
             AccessibilityNodeInfo parent = node.getParent();
+            int parentDepth = 0;
 
-            while (parent != null) {
+            while (parent != null && parentDepth++ < 30) {
                 if (parent.isClickable() ||
                     (longClick && parent.isLongClickable())) {
                     if (parent.performAction(action)) return true;
@@ -315,7 +316,7 @@ public class ArtherAccessibilityService extends AccessibilityService {
 
         // Prefer the app's own scroll container so nested lists and web views
         // receive a semantic scroll action before using a screen-wide gesture.
-        if (root != null && scrollNode(root, action)) return true;
+        if (root != null && scrollNode(root, action, 0, new int[]{0})) return true;
 
         float x = getResources().getDisplayMetrics().widthPixels / 2f;
         float h = getResources().getDisplayMetrics().heightPixels;
@@ -325,13 +326,20 @@ public class ArtherAccessibilityService extends AccessibilityService {
         );
     }
 
-    private boolean scrollNode(AccessibilityNodeInfo node, int action) {
-        if (node == null || !node.isVisibleToUser()) return false;
+    private boolean scrollNode(
+        AccessibilityNodeInfo node,
+        int action,
+        int depth,
+        int[] visited
+    ) {
+        if (node == null || depth > 30 || visited[0] >= 500 ||
+            !node.isVisibleToUser()) return false;
+        visited[0]++;
         if (node.isScrollable() && node.performAction(action)) return true;
 
-        for (int i = 0; i < node.getChildCount(); i++) {
+        for (int i = 0; i < node.getChildCount() && visited[0] < 500; i++) {
             AccessibilityNodeInfo child = node.getChild(i);
-            if (child != null && scrollNode(child, action)) return true;
+            if (child != null && scrollNode(child, action, depth + 1, visited)) return true;
         }
         return false;
     }
