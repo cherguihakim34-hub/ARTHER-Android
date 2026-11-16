@@ -717,9 +717,13 @@ async function runArther() {
     const message = error.name === "AbortError"
       ? "انتهت مهلة الطلب. لم يتم تأكيد اكتمال التنفيذ؛ يمكنك إعادة المحاولة."
       : error.message;
-    addChatMessage("assistant", "تعذر إكمال الطلب: " + message);
+    const spokenError = "تعذر إكمال الطلب: " + message;
+    addChatMessage("assistant", spokenError);
     show("خطأ: " + message);
     connection.textContent = "خطأ في الاتصال";
+    // Keep wake-word mode alive after a network/API failure too. Native TTS
+    // completion re-arms listening; the normal fallback timer covers TTS errors.
+    speak(spokenError);
 
   } finally {
     clearTimeout(requestTimeout);
