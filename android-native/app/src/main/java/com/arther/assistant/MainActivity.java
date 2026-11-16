@@ -146,6 +146,8 @@ public class MainActivity extends BridgeActivity {
                 c.put("batteryOptimizationIgnored", android.os.Build.VERSION.SDK_INT < 23 ||
                     (power != null && power.isIgnoringBatteryOptimizations(activity.getPackageName())));
                 c.put("voiceServiceRunning", ArtherWakeService.isRunning);
+                c.put("speechRecognitionAvailable", SpeechRecognizer.isRecognitionAvailable(activity));
+                c.put("textToSpeechReady", ttsReady);
                 c.put("accessibility", ArtherAccessibilityService.isEnabled());
                 boolean running = Shizuku.pingBinder();
                 c.put("shizukuRunning", running);
