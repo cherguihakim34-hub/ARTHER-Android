@@ -129,6 +129,10 @@ function show(message) {
 
 function speak(message) {
   const value = String(message || "");
+  // Never open the microphone while ARTHER is speaking; this prevents its
+  // own TTS audio from being transcribed as a fresh command.
+  clearTimeout(wakeRestartTimer);
+  wakeRestartTimer = null;
   if (window.ArtherNative?.speak) {
     clearTimeout(speechRestartTimer);
     const fallbackDelay = Math.min(45000, Math.max(5000, value.split(/\s+/).length * 520));
