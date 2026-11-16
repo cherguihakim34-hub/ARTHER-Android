@@ -421,6 +421,29 @@ function isDeviceInfoRequest(prompt) {
 function executeLocalCommand(prompt) {
   const text = normalizeCommand(prompt);
 
+  if (/(التطبيقات المثبته|التطبيقات الموجودة|اعرض التطبيقات|قائمه التطبيقات|قائمة التطبيقات|list installed apps|show installed apps|mes applications installees)/.test(text)) {
+    try {
+      const rawApps = window.ArtherNative?.getInstalledApps?.() || "[]";
+      const apps = JSON.parse(rawApps);
+      if (!Array.isArray(apps) || !apps.length) {
+        const message = "لم أتمكن من قراءة قائمة التطبيقات المثبتة.";
+        show(message);
+        speak(message);
+      } else {
+        const message = "التطبيقات المثبتة على الهاتف (" + apps.length + "):\n" +
+          apps.map((name, index) => (index + 1) + ". " + name).join("\n");
+        addChatMessage("assistant", message);
+        show(message);
+        speak("وجدت " + apps.length + " تطبيقاً. عرضت أسماءها على الشاشة. اذكر اسم التطبيق لفتحه.");
+      }
+    } catch (_) {
+      const message = "تعذر قراءة قائمة التطبيقات.";
+      show(message);
+      speak(message);
+    }
+    return true;
+  }
+
   // Handle compound location requests before the generic "open app" parser.
   // Otherwise "open Google Maps and find my location" is consumed as app launch only.
   if (/(موقعي الحالي|موقع.*(?:gps|جي بي اس).*(?:الحالي|الان)|(?:gps|جي بي اس).*(?:موقعي|موقع الهاتف|position)|موقع الهاتف.*(?:الحالي|الان)|اعطني.*موقع.*(?:الهاتف|هاتف|gps)|اعطيني.*موقع.*(?:الهاتف|هاتف|gps)|اين انا|وين راني|حدد موقعي|اعرف موقعي|مكاني الحالي|where am i|my current location|find my location|ma position actuelle|ou suis je)/.test(text)) {
