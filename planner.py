@@ -216,6 +216,7 @@ Available capability labels:
 - write_file
 - list_repo_files
 - read_repo_file
+- search_repo_files
 - save_memory
 - search_memories
 - none
@@ -266,6 +267,7 @@ Rules:
             "write_file",
             "list_repo_files",
             "read_repo_file",
+            "search_repo_files",
             "save_memory",
             "search_memories",
             "none",
