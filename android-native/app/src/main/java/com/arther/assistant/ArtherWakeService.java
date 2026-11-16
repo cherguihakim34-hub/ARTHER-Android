@@ -9,11 +9,13 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 
 public class ArtherWakeService extends Service {
     private static final String CHANNEL_ID = "arther_voice_service";
     private static final int NOTIFICATION_ID = 11901;
     public static volatile boolean isRunning = false;
+    private PowerManager.WakeLock wakeLock;
 
     @Override
     public void onCreate() {
@@ -52,6 +54,7 @@ public class ArtherWakeService extends Service {
             } else {
                 startForeground(NOTIFICATION_ID, notification);
             }
+            acquireCpuWakeLock();
             isRunning = true;
         } catch (SecurityException | IllegalStateException error) {
             isRunning = false;
@@ -59,6 +62,28 @@ public class ArtherWakeService extends Service {
             return START_NOT_STICKY;
         }
         return START_NOT_STICKY;
+    }
+
+    private void acquireCpuWakeLock() {
+        try {
+            PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+            if (power == null) return;
+            if (wakeLock == null) {
+                wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ARTHER:VoiceWake");
+                wakeLock.setReferenceCounted(false);
+            }
+            if (!wakeLock.isHeld()) {
+                // Bound the lock as a safety net; the service releases it on shutdown.
+                wakeLock.acquire(12L * 60L * 60L * 1000L);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void releaseCpuWakeLock() {
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+        } catch (Exception ignored) {}
+        wakeLock = null;
     }
 
     private void createNotificationChannel() {
@@ -77,6 +102,7 @@ public class ArtherWakeService extends Service {
     @Override
     public void onDestroy() {
         isRunning = false;
+        releaseCpuWakeLock();
         super.onDestroy();
     }
     @Override
