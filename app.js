@@ -302,7 +302,7 @@ window.ArtherCapabilities = function(raw) {
     const lines = [
       "الميكروفون: " + (c.microphone ? "مسموح" : "يحتاج إذناً"),
       "الاستماع بالخلفية: " + (c.voiceServiceRunning ? "الخدمة تعمل" : "غير نشط"),
-      "الموقع: " + (c.location ? "مسموح" : "يحتاج إذناً"),
+      "الموقع: " + (!c.location ? "يحتاج إذناً" : (c.locationPrecise ? "دقيق" : "تقريبي فقط")),
       "التحكم بالشاشة: " + (c.accessibility ? "مفعّل" : "غير مفعّل"),
       "تعديل السطوع: " + (c.writeSettings ? "مسموح" : "يحتاج إذناً"),
       "العمل في الخلفية: " + (c.batteryOptimizationIgnored ? "مسموح" : "قد توقفه البطارية"),
