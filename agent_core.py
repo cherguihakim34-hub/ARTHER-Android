@@ -94,6 +94,8 @@ Capabilities:
 - List repository files recursively.
 - Search GitHub filenames and file contents.
 - Read and write files in the temporary workspace.
+- Read GitHub files and search repository code.
+- Create or update GitHub files only when the explicit write gate and token permissions are configured.
 - Search and save permanent memories.
 - Analyze tool results.
 
