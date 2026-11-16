@@ -865,7 +865,13 @@ async def search_repo_files(
 # GITHUB FILE WRITING
 # ============================================================
 
-async def write_repo_file(path, content, message, sha=""):
+async def write_repo_file(path, content, message, approved=False, sha=""):
+    if approved is not True:
+        return {
+            "ok": False,
+            "error": "This write requires explicit user approval in the current conversation. Ask for approval before retrying."
+        }
+
     if not GITHUB_ALLOW_WRITES:
         return {
             "ok": False,
@@ -1036,14 +1042,15 @@ TOOLS = [
 
     tool_definition(
         "write_repo_file",
-        "Create a new file or update an existing file in the configured non-production GitHub branch. Requires GITHUB_ALLOW_WRITES=true and a write-scoped token. For updates, first read the file to obtain its SHA and ask the user for explicit approval before overwriting.",
+        "Create a new file or update an existing file in the configured non-production GitHub branch. Requires explicit user approval (approved=true), GITHUB_ALLOW_WRITES=true and a write-scoped token. For updates, first read the file to obtain its SHA.",
         {
             "path": {"type": "string"},
             "content": {"type": "string"},
             "message": {"type": "string"},
-            "sha": {"type": "string"}
+            "sha": {"type": "string"},
+            "approved": {"type": "boolean"}
         },
-        ["path", "content", "message"]
+        ["path", "content", "message", "approved"]
     ),
 
     tool_definition(
