@@ -62,6 +62,8 @@ public class ArtherWakeService extends Service {
             startRecognition();
             return START_NOT_STICKY;
         }
+        // A normal start request is an explicit request to resume listening.
+        paused = false;
         if (intent != null) {
             String selected = intent.getStringExtra(EXTRA_LANGUAGE);
             if (selected != null) {
