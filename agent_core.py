@@ -1229,6 +1229,7 @@ def create_local_plan(prompt):
                     "list_repo_files",
                     "read_repo_file",
                     "search_repo_files",
+                    "run_experiment",
                     "save_memory",
                     "search_memories"
                 ]
