@@ -25,7 +25,7 @@ Set these environment variables on the backend:
 - Android intents for apps, maps, settings, calls, SMS composition, timers and alarms.
 - Optional Accessibility service for navigation, screen gestures, text entry and visible screen text.
 - Flashlight, volume, brightness (subject to Android permissions), device information and current location.
-- Server-side agent tools for workspace files, repository reading/search, and PostgreSQL memory.
+- Server-side agent tools for workspace files, repository reading/search, and PostgreSQL memory.\n- Bounded numerical experiments through a safe simulation DSL (arithmetic, math functions, variables, conditionals, and capped `range` loops).
 
 ## Important limitations
 - Wake-word listening currently runs while ARTHER is open in the foreground; it is not an always-on background assistant.
@@ -34,7 +34,7 @@ Set these environment variables on the backend:
 - Accessibility actions work only when the service is enabled and the target app exposes accessible UI elements.
 - Android restricts some system toggles and background operations.
 - Voice speaker identification (ignoring other speakers) is not implemented.
-- The research endpoint does not execute arbitrary Python; secure isolated execution must be added before enabling it.
+- The experiment endpoint runs only the restricted ARTHER simulation DSL; it does not execute arbitrary Python, imports, shell commands, network calls, or filesystem access. Each run is capped by source size, AST size, loop length, operation count, and output size. This is suitable for bounded numerical demonstrations, not untrusted general-purpose code execution.
 - The APK artifact is a debug build, not a signed Play Store release.
 
 ARTHER reports an action as complete only when the available operation returns evidence of success. A successful build does not replace testing on the actual phone.
