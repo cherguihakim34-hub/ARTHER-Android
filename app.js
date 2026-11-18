@@ -765,6 +765,62 @@ async function runArther() {
   }
 }
 
+const EXPERIMENT_EXAMPLE = "position = 0\\nvelocity = 2\\nresults = []\\nfor step in range(5):\\n    position = position + velocity\\n    results.append(position)\\nprint(results)";
+
+async function runExperiment() {
+  const editor = $("experimentCode");
+  const output = $("experimentOutput");
+  const button = $("runExperiment");
+  const code = editor?.value?.trim() || "";
+  if (!code) {
+    if (output) output.textContent = "اكتب خطوات التجربة أولاً.";
+    return;
+  }
+  if (button) button.disabled = true;
+  if (output) output.textContent = "جارٍ تشغيل المحاكاة والتحقق من الحدود...";
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch(API + "/api/experiment", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      signal: controller.signal,
+      body: JSON.stringify({code})
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 501) {
+        throw new Error("محرك التجارب لم يُنشر على الخادم بعد. لا تزال هذه النسخة من الخادم لا تدعم المحاكاة.");
+      }
+      throw new Error(data.detail || "فشل تشغيل التجربة.");
+    }
+    const summary = [
+      "الحالة: " + (data.status || "غير معروفة"),
+      "المحرك: " + (data.engine || "ARTHER"),
+      "عدد خطوات التنفيذ: " + (data.steps ?? "—"),
+      "",
+      "المتغيرات:",
+      JSON.stringify(data.variables || {}, null, 2),
+      "",
+      "النتائج:",
+      JSON.stringify(data.results ?? [], null, 2),
+      "",
+      "المخرجات:",
+      data.stdout || "لا توجد مخرجات نصية."
+    ].join("\\n");
+    if (output) output.textContent = summary;
+    addChatMessage("assistant", "اكتملت المحاكاة الحسابية. عدد خطوات التنفيذ: " + (data.steps ?? "غير متاح") + ".");
+  } catch (error) {
+    const message = error.name === "AbortError"
+      ? "انتهت مهلة التجربة. لم يتم تأكيد اكتمالها."
+      : error.message;
+    if (output) output.textContent = "تعذر تشغيل التجربة: " + message;
+  } finally {
+    clearTimeout(timeout);
+    if (button) button.disabled = false;
+  }
+}
+
 const languageSelect = $("language");
 if (languageSelect) {
   try {
@@ -859,8 +915,10 @@ if ($("clear")) $("clear").addEventListener("click", () => {
   if ($("question")) $("question").value = "";
   if ($("report")) $("report").classList.add("hidden");
 });
-if ($("execute")) $("execute").addEventListener("click", () => {
-  show("تنفيذ Python غير متاح حالياً على الخادم.");
+if ($("runExperiment")) $("runExperiment").addEventListener("click", runExperiment);
+if ($("resetExperiment")) $("resetExperiment").addEventListener("click", () => {
+  if ($("experimentCode")) $("experimentCode").value = EXPERIMENT_EXAMPLE;
+  if ($("experimentOutput")) $("experimentOutput").textContent = "تم استعادة مثال المحاكاة.";
 });
 
 async function checkConnection() {
