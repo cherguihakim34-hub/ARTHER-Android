@@ -129,8 +129,8 @@ function show(message) {
 
 function speak(message) {
   const value = String(message || "");
-  // Never open the microphone while ARTHER is speaking; this prevents its
-  // own TTS audio from being transcribed as a fresh command.
+  // Pause native recognition while ARTHER speaks to prevent feedback.
+  window.ArtherNative?.pauseListening?.();
   clearTimeout(wakeRestartTimer);
   wakeRestartTimer = null;
   if (window.ArtherNative?.speak) {
@@ -159,7 +159,8 @@ function speak(message) {
 window.ArtherSpeechFinished = function() {
   clearTimeout(speechRestartTimer);
   speechRestartTimer = null;
-  scheduleWakeListening(450);
+  if (wakeWordMode) window.ArtherNative?.resumeListening?.();
+  scheduleWakeListening(900);
 };
 function preferredSpeechLanguage() {
   const choice = $("language")?.value || "auto";
@@ -277,6 +278,7 @@ window.ArtherVoiceResult = function(text) {
 
   wakeArmed = false;
   clearTimeout(wakeArmTimer);
+  window.ArtherNative?.pauseListening?.();
   question.value = command;
   voiceStatus.textContent = "أسمع أمرك...";
   runArther();
@@ -694,6 +696,7 @@ function executeLocalCommand(prompt) {
 async function runArther() {
   const prompt = question.value.trim();
   if (!prompt || busy) return;
+  window.ArtherNative?.pauseListening?.();
   if (executeLocalCommand(prompt)) {
     addChatMessage("user", prompt);
     scheduleWakeListening(1600);
