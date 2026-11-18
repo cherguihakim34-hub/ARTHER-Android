@@ -127,8 +127,11 @@ public class ArtherWakeService extends Service {
             Intent query = new Intent(android.speech.RecognitionService.SERVICE_INTERFACE);
             List<ResolveInfo> services = getPackageManager().queryIntentServices(query, PackageManager.MATCH_ALL);
             for (ResolveInfo info : services) {
-                if (!forceDefaultProvider && info.serviceInfo != null &&
-                    "com.google.android.googlequicksearchbox".equals(info.serviceInfo.packageName)) {
+                if (info.serviceInfo == null) continue;
+                boolean googleProvider = "com.google.android.googlequicksearchbox"
+                    .equals(info.serviceInfo.packageName);
+                if ((!forceDefaultProvider && googleProvider) ||
+                    (forceDefaultProvider && !googleProvider)) {
                     selected = new ComponentName(info.serviceInfo.packageName, info.serviceInfo.name);
                     break;
                 }
