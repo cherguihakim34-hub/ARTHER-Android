@@ -19,8 +19,6 @@ import android.content.pm.ResolveInfo;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.os.Bundle;
-import android.speech.RecognitionListener;
-import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
@@ -119,13 +117,11 @@ public class MainActivity extends BridgeActivity {
     public static class ArtherBridge {
         private final MainActivity activity;
         private final WebView webView;
-        private SpeechRecognizer recognizer;
         private TextToSpeech tts;
         private String pendingFlash;
         private String speechLanguageOverride = "auto";
         private boolean ttsReady = false;
         private String pendingSpeech;
-        private boolean forceDefaultRecognitionService = false;
 
         ArtherBridge(MainActivity activity, WebView webView) {
             this.activity = activity;
@@ -1039,7 +1035,6 @@ public class MainActivity extends BridgeActivity {
             voiceReceiverRegistered = false;
         }
         if (artherBridge != null) {
-            if (artherBridge.recognizer != null) artherBridge.recognizer.destroy();
             if (artherBridge.tts != null) artherBridge.tts.shutdown();
         }
         super.onDestroy();
