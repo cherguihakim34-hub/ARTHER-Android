@@ -201,6 +201,15 @@ window.ArtherListeningStatus = function(message) {
   const status = String(message || "");
   voiceStatus.textContent = status;
 
+  if (/تم إيقاف الاستماع الصوتي من الإشعار/.test(status)) {
+    wakeWordMode = false;
+    wakeArmed = false;
+    clearTimeout(wakeRestartTimer);
+    clearTimeout(wakeArmTimer);
+    voiceStatus.textContent = "تم إيقاف الاستماع من الإشعار.";
+    return;
+  }
+
   if (/أنا أستمع إليك/.test(status)) {
     wakeError11Count = 0;
     return;
