@@ -1,0 +1,3 @@
+ARTHER Android version 119 test build request.
+Source: main branch after merge d8b39322a13d6b460d87dd0888f6053b414aa35f.
+Purpose: generate installable debug APK for real-device testing.
