@@ -365,3 +365,51 @@ footer { margin-top: 36px; }
   border-color: var(--cyan);
   box-shadow: 0 0 0 3px #58d9d120;
 }
+
+
+/* Bounded numerical experiment workspace */
+.experiment-panel {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(155deg, #10283a, #091725);
+}
+.experiment-panel h2 {
+  margin: 0 0 8px;
+  color: var(--cyan);
+  font-size: 17px;
+}
+.experiment-panel .hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.experiment-panel label {
+  display: block;
+  margin: 12px 0 8px;
+  font-weight: bold;
+}
+.experiment-panel textarea {
+  direction: ltr;
+  text-align: left;
+  min-height: 170px;
+  font: 14px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
+  tab-size: 4;
+}
+.experiment-output {
+  min-height: 72px;
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  direction: ltr;
+  text-align: left;
+  padding: 13px;
+  margin: 12px 0 0;
+  border: 1px solid #29435a;
+  border-radius: 11px;
+  background: #06111d;
+  color: #cde6f4;
+  font: 13px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
