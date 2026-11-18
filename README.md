@@ -28,7 +28,7 @@ Set these environment variables on the backend:
 - Server-side agent tools for workspace files, repository reading/search, and PostgreSQL memory.\n- Bounded numerical experiments through a safe simulation DSL (arithmetic, math functions, variables, conditionals, and capped `range` loops).
 
 ## Important limitations
-- Wake-word listening currently runs while ARTHER is open in the foreground; it is not an always-on background assistant.
+- Wake-word listening uses Android SpeechRecognizer in a foreground microphone service and can continue while Android keeps the app process and service alive. It is not guaranteed after force-stop, process termination, reboot, or manufacturer battery restrictions, and it is not a dedicated low-power offline hotword engine.
 - Android requires user approval for microphone, location, Accessibility and special settings permissions.
 - Shizuku is currently detected and permission-requested; a privileged Shizuku command bridge is not yet implemented.
 - Accessibility actions work only when the service is enabled and the target app exposes accessible UI elements.
