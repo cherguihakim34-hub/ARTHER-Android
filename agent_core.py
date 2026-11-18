@@ -7,6 +7,8 @@ from pathlib import Path
 
 import httpx
 
+from safe_experiment import ExperimentError, run_experiment
+
 from memory_store import (
     get_history,
     save_message,
@@ -1041,6 +1043,15 @@ TOOLS = [
     ),
 
     tool_definition(
+        "run_experiment",
+        "Run a bounded numerical simulation using ARTHER's safe DSL. Supports arithmetic, variables, math functions, if statements, range loops and results.append(value). No imports, shell, filesystem or network access.",
+        {
+            "code": {"type": "string"}
+        },
+        ["code"]
+    ),
+
+    tool_definition(
         "write_repo_file",
         "Create a new file or update an existing file in the configured non-production GitHub branch. Requires explicit user approval (approved=true), GITHUB_ALLOW_WRITES=true and a write-scoped token. For updates, first read the file to obtain its SHA.",
         {
@@ -1102,6 +1113,13 @@ async def call_tool(name, arguments):
 
     if name == "search_repo_files":
         return await search_repo_files(**arguments)
+
+    if name == "run_experiment":
+        try:
+            result = run_experiment(arguments.get("code", ""))
+            return {"ok": True, **result}
+        except ExperimentError as exc:
+            return {"ok": False, "error": str(exc)}
 
     if name == "write_repo_file":
         return await write_repo_file(**arguments)
