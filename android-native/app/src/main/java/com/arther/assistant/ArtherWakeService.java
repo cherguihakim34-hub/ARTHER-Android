@@ -31,6 +31,7 @@ public class ArtherWakeService extends Service {
     public static final String EXTRA_LANGUAGE = "language";
     public static final String ACTION_PAUSE = "com.arther.assistant.PAUSE_VOICE";
     public static final String ACTION_RESUME = "com.arther.assistant.RESUME_VOICE";
+    public static final String ACTION_STOP = "com.arther.assistant.STOP_VOICE";
     private static final String CHANNEL_ID = "arther_voice_service";
     private static final int NOTIFICATION_ID = 11901;
 
@@ -53,6 +54,16 @@ public class ArtherWakeService extends Service {
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
+        if (ACTION_STOP.equals(action)) {
+            paused = true;
+            isPaused = true;
+            stopRecognition();
+            releaseCpuWakeLock();
+            sendEvent("status", "تم إيقاف الاستماع الصوتي من الإشعار");
+            stopForeground(true);
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
         if (ACTION_PAUSE.equals(action)) {
             paused = true;
             isPaused = true;
@@ -96,11 +107,18 @@ public class ArtherWakeService extends Service {
             Notification.Builder builder = Build.VERSION.SDK_INT >= 26
                 ? new Notification.Builder(this, CHANNEL_ID)
                 : new Notification.Builder(this);
+            Intent stopIntent = new Intent(this, ArtherWakeService.class);
+            stopIntent.setAction(ACTION_STOP);
+            PendingIntent stopPendingIntent = PendingIntent.getService(
+                this, 120, stopIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
             Notification notification = builder
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
                 .setContentTitle("ARTHER · الاستعداد الصوتي")
-                .setContentText("الاستماع الصوتي يعمل. اضغط لفتح المساعد أو أوقفه من داخله.")
+                .setContentText("الاستماع الصوتي يعمل. يمكنك إيقافه من هذا الإشعار.")
                 .setContentIntent(pendingIntent)
+                .addAction(android.R.drawable.ic_media_pause, "إيقاف الاستماع", stopPendingIntent)
                 .setOngoing(true)
                 .setCategory(Notification.CATEGORY_SERVICE)
                 .setOnlyAlertOnce(true)
