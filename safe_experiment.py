@@ -35,8 +35,10 @@ class SafeExperiment:
             raise ExperimentError("حجم التجربة أكبر من الحد المسموح (5000 حرف).")
         try:
             self.tree = ast.parse(source, mode="exec")
-        except SyntaxError as exc:
-            raise ExperimentError(f"خطأ في صياغة التجربة عند السطر {exc.lineno or '?'}: {exc.msg}") from exc
+        except Exception as exc:
+            line = getattr(exc, "lineno", None) or "?"
+            message = getattr(exc, "msg", str(exc))
+            raise ExperimentError(f"خطأ في صياغة التجربة عند السطر {line}: {message}") from exc
         if sum(1 for _ in ast.walk(self.tree)) > MAX_AST_NODES:
             raise ExperimentError("التجربة معقدة أكثر من الحد المسموح.")
         self.env = dict(_FUNCTIONS)
@@ -52,7 +54,12 @@ class SafeExperiment:
             raise ExperimentError("تجاوزت التجربة حد العمليات الآمن (20000 خطوة).")
 
     def run(self):
-        self.exec_block(self.tree.body)
+        try:
+            self.exec_block(self.tree.body)
+        except ExperimentError:
+            raise
+        except Exception as exc:
+            raise ExperimentError(f"تعذر تنفيذ العملية بأمان: {str(exc)[:180]}") from exc
         variables = {}
         for key, value in self.env.items():
             if key.startswith("_") or key in _FUNCTIONS or key in _CONSTANTS or key == "results":
@@ -92,7 +99,7 @@ class SafeExperiment:
             if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
                 raise ExperimentError("يسمح بالإسناد إلى متغير واحد فقط في كل سطر.")
             name = node.targets[0].id
-            if name.startswith("_") or name in _FUNCTIONS or name in _CONSTANTS:
+            if name.startswith("_") or name in _FUNCTIONS or name in _CONSTANTS or name in {"range", "print", "emit", "results"}:
                 raise ExperimentError("اسم المتغير محجوز أو غير مسموح.")
             self.env[name] = self.eval_expr(node.value)
             return
@@ -108,6 +115,8 @@ class SafeExperiment:
         if isinstance(node, ast.For):
             if not isinstance(node.target, ast.Name) or not isinstance(node.iter, ast.Call) or not isinstance(node.iter.func, ast.Name) or node.iter.func.id != "range":
                 raise ExperimentError("حلقة for يجب أن تستخدم range(...) فقط.")
+            if node.target.id.startswith("_") or node.target.id in _FUNCTIONS or node.target.id in _CONSTANTS or node.target.id in {"range", "print", "emit", "results"}:
+                raise ExperimentError("اسم متغير الحلقة محجوز أو غير مسموح.")
             values = self.eval_expr(node.iter)
             for value in values:
                 self.tick()
@@ -196,7 +205,11 @@ class SafeExperiment:
                 if not 1 <= len(args) <= 3 or any(not isinstance(v, int) for v in args):
                     raise ExperimentError("range يقبل من 1 إلى 3 أعداد صحيحة.")
                 values = range(*args)
-                if len(values) > MAX_RANGE_ITEMS:
+                try:
+                    count = len(values)
+                except OverflowError as exc:
+                    raise ExperimentError("مدى الحلقة أكبر من الحد المسموح.") from exc
+                if count > MAX_RANGE_ITEMS:
                     raise ExperimentError("الحد الأقصى لحلقة range هو 5000 تكرار.")
                 return values
             if name in {"print", "emit"}:
@@ -213,6 +226,18 @@ class SafeExperiment:
         raise ExperimentError(f"عملية غير مسموحة: {type(node).__name__}.")
 
     def apply_binop(self, operator, left, right):
+        if isinstance(operator, ast.Add) and isinstance(left, (str, list, tuple)) and isinstance(right, type(left)):
+            if len(left) + len(right) > (2000 if isinstance(left, str) else MAX_LIST_ITEMS):
+                raise ExperimentError("حجم الناتج تجاوز الحد المسموح.")
+        if isinstance(operator, ast.Mult):
+            if isinstance(left, (str, list, tuple)) and isinstance(right, int):
+                limit = 2000 if isinstance(left, str) else MAX_LIST_ITEMS
+                if len(left) * abs(right) > limit:
+                    raise ExperimentError("حجم الناتج تجاوز الحد المسموح.")
+            if isinstance(right, (str, list, tuple)) and isinstance(left, int):
+                limit = 2000 if isinstance(right, str) else MAX_LIST_ITEMS
+                if len(right) * abs(left) > limit:
+                    raise ExperimentError("حجم الناتج تجاوز الحد المسموح.")
         try:
             if isinstance(operator, ast.Add): result = left + right
             elif isinstance(operator, ast.Sub): result = left - right
