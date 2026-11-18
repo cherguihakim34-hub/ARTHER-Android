@@ -8,7 +8,6 @@ class SafeExperimentTests(unittest.TestCase):
         result = run_experiment(
             "position = 0\n"
             "velocity = 2\n"
-            "results = []\n"
             "for step in range(5):\n"
             "    position = position + velocity\n"
             "    results.append(position)\n"
