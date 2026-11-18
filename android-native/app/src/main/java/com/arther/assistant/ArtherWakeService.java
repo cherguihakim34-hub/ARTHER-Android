@@ -36,6 +36,7 @@ public class ArtherWakeService extends Service {
 
     public static volatile boolean isRunning = false;
     public static volatile boolean isListening = false;
+    public static volatile boolean isPaused = false;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SpeechRecognizer recognizer;
@@ -54,6 +55,7 @@ public class ArtherWakeService extends Service {
         String action = intent == null ? null : intent.getAction();
         if (ACTION_PAUSE.equals(action)) {
             paused = true;
+            isPaused = true;
             stopRecognition();
             // Do not keep the CPU awake while text-to-speech is playing.
             releaseCpuWakeLock();
@@ -61,12 +63,14 @@ public class ArtherWakeService extends Service {
         }
         if (ACTION_RESUME.equals(action)) {
             paused = false;
+            isPaused = false;
             if (isRunning) acquireCpuWakeLock();
             startRecognition();
             return START_NOT_STICKY;
         }
         // A normal start request is an explicit request to resume listening.
         paused = false;
+        isPaused = false;
         if (intent != null) {
             String selected = intent.getStringExtra(EXTRA_LANGUAGE);
             if (selected != null) {
@@ -270,6 +274,7 @@ public class ArtherWakeService extends Service {
         handler.removeCallbacksAndMessages(null);
         stopRecognition();
         isRunning = false;
+        isPaused = false;
         releaseCpuWakeLock();
         super.onDestroy();
     }
