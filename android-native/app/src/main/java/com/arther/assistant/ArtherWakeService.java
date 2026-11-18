@@ -167,8 +167,9 @@ public class ArtherWakeService extends Service {
                     String transcript = matches != null && !matches.isEmpty() ? matches.get(0) : "";
                     isListening = false;
                     sendEvent("result", transcript);
+                    // The app decides when to resume after processing the transcript.
+                    // This prevents recognition restarting during command execution or TTS.
                     destroyRecognizer();
-                    scheduleRestart(650);
                 }
                 @Override public void onPartialResults(Bundle partial) {}
                 @Override public void onEvent(int eventType, Bundle params) {}
