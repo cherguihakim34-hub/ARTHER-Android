@@ -1,5 +1,6 @@
 """A bounded arithmetic simulation DSL. It never executes Python bytecode or imports user code."""
 import ast
+import json
 import math
 
 MAX_SOURCE_CHARS = 5000
@@ -75,8 +76,14 @@ class SafeExperiment:
         }
 
     def clean(self, value):
-        if value is None or isinstance(value, (str, bool, int)):
-            if isinstance(value, str) and len(value) > 2000:
+        if isinstance(value, bool) or value is None:
+            return value
+        if isinstance(value, int):
+            if abs(value) > 10 ** 100:
+                raise ExperimentError("القيمة الصحيحة تجاوزت المجال العددي الآمن.")
+            return value
+        if isinstance(value, str):
+            if len(value) > 2000:
                 return value[:2000] + "…"
             return value
         if isinstance(value, float):
