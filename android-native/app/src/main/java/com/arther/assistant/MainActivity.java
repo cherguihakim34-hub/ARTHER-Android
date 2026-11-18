@@ -2,6 +2,9 @@ package com.arther.assistant;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
 import android.net.Uri;
 import android.location.Location;
 import android.location.LocationManager;
@@ -39,6 +42,20 @@ import java.util.Set;
 
 public class MainActivity extends BridgeActivity {
     private ArtherBridge artherBridge;
+    private boolean voiceReceiverRegistered = false;
+    private final BroadcastReceiver voiceReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (intent == null) return;
+            String type = intent.getStringExtra(ArtherWakeService.EXTRA_EVENT);
+            String value = intent.getStringExtra(ArtherWakeService.EXTRA_TEXT);
+            String safe = JSONObject.quote(value == null ? "" : value);
+            String script = "result".equals(type)
+                ? "if(window.ArtherVoiceResult){window.ArtherVoiceResult(" + safe + ");}"
+                : "if(window.ArtherListeningStatus){window.ArtherListeningStatus(" + safe + ");}";
+            WebView view = getBridge() == null ? null : getBridge().getWebView();
+            if (view != null) view.evaluateJavascript(script, null);
+        }
+    };
     private static final int SHIZUKU_REQUEST_CODE = 4102;
     private final Shizuku.OnRequestPermissionResultListener shizukuPermissionListener = (requestCode, grantResult) -> {
         if (requestCode == SHIZUKU_REQUEST_CODE && artherBridge != null) {
@@ -53,6 +70,13 @@ public class MainActivity extends BridgeActivity {
         WebView webView = getBridge().getWebView();
         artherBridge = new ArtherBridge(this, webView);
         webView.addJavascriptInterface(artherBridge, "ArtherNative");
+        IntentFilter voiceFilter = new IntentFilter(ArtherWakeService.ACTION_EVENT);
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(voiceReceiver, voiceFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(voiceReceiver, voiceFilter);
+        }
+        voiceReceiverRegistered = true;
         Shizuku.addRequestPermissionResultListener(shizukuPermissionListener);
     }
 
@@ -115,11 +139,13 @@ public class MainActivity extends BridgeActivity {
                     tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                         @Override public void onStart(String utteranceId) {}
                         @Override public void onDone(String utteranceId) {
+                            resumeVoiceService();
                             webView.post(() -> webView.evaluateJavascript(
                                 "if(window.ArtherSpeechFinished){window.ArtherSpeechFinished();}", null
                             ));
                         }
                         @Override public void onError(String utteranceId) {
+                            resumeVoiceService();
                             webView.post(() -> webView.evaluateJavascript(
                                 "if(window.ArtherSpeechFinished){window.ArtherSpeechFinished();}", null
                             ));
@@ -128,6 +154,7 @@ public class MainActivity extends BridgeActivity {
                     if (pendingSpeech != null && !pendingSpeech.trim().isEmpty()) {
                         String queued = pendingSpeech;
                         pendingSpeech = null;
+                        pauseVoiceService();
                         tts.speak(queued, TextToSpeech.QUEUE_FLUSH, null, "ARTHER_REPLY");
                     }
                 }
@@ -151,6 +178,7 @@ public class MainActivity extends BridgeActivity {
                 c.put("batteryOptimizationIgnored", android.os.Build.VERSION.SDK_INT < 23 ||
                     (power != null && power.isIgnoringBatteryOptimizations(activity.getPackageName())));
                 c.put("voiceServiceRunning", ArtherWakeService.isRunning);
+                c.put("speechRecognitionActive", ArtherWakeService.isListening);
                 c.put("speechRecognitionAvailable", SpeechRecognizer.isRecognitionAvailable(activity));
                 c.put("textToSpeechReady", ttsReady);
                 c.put("accessibility", ArtherAccessibilityService.isEnabled());
@@ -297,171 +325,38 @@ public class MainActivity extends BridgeActivity {
             activity.runOnUiThread(() -> {
                 if (activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                     sendStatus("أحتاج إذن الميكروفون. اسمح لـ ARTHER باستخدام الميكروفون.");
-                    activity.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 701);
-                    return;
+                    activity.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 701); return;
                 }
-                startWakeService();
-                beginListening();
+                try {
+                    Intent service = new Intent(activity, ArtherWakeService.class);
+                    service.putExtra(ArtherWakeService.EXTRA_LANGUAGE, speechLanguageOverride);
+                    if (android.os.Build.VERSION.SDK_INT >= 26) activity.startForegroundService(service); else activity.startService(service);
+                    sendStatus("جارٍ تشغيل الاستماع الصوتي...");
+                } catch (Exception error) { sendStatus("تعذر تشغيل خدمة الاستماع: " + error.getClass().getSimpleName()); }
             });
         }
 
-        private void startWakeService() {
-            try {
-                Intent service = new Intent(activity, ArtherWakeService.class);
-                if (android.os.Build.VERSION.SDK_INT >= 26) activity.startForegroundService(service);
-                else activity.startService(service);
-            } catch (Exception error) {
-                sendStatus("تعذر تشغيل خدمة الاستعداد الصوتي: " + error.getClass().getSimpleName());
-            }
-        }
-
         @JavascriptInterface
-        public boolean isVoiceServiceRunning() {
-            return ArtherWakeService.isRunning;
+        public boolean isVoiceServiceRunning() { return ArtherWakeService.isRunning && ArtherWakeService.isListening; }
+
+        private void pauseVoiceService() {
+            try { if (ArtherWakeService.isRunning) {
+                Intent intent = new Intent(activity, ArtherWakeService.class); intent.setAction(ArtherWakeService.ACTION_PAUSE); activity.startService(intent);
+            }} catch (Exception ignored) {}
         }
+        private void resumeVoiceService() {
+            try { if (ArtherWakeService.isRunning) {
+                Intent intent = new Intent(activity, ArtherWakeService.class); intent.setAction(ArtherWakeService.ACTION_RESUME); activity.startService(intent);
+            }} catch (Exception ignored) {}
+        }
+        @JavascriptInterface
+        public void pauseListening() { activity.runOnUiThread(this::pauseVoiceService); }
         @JavascriptInterface
         public void stopListening() {
             activity.runOnUiThread(() -> {
-                // Stop the Android service even if the speech provider throws while
-                // cancelling its current recognition session.
-                SpeechRecognizer current = recognizer;
-                recognizer = null;
-                if (current != null) {
-                    try { current.cancel(); } catch (Exception ignored) {}
-                    try { current.destroy(); } catch (Exception ignored) {}
-                }
-                try {
-                    activity.stopService(new Intent(activity, ArtherWakeService.class));
-                    getCapabilities();
-                    sendStatus("تم إيقاف الاستماع الصوتي");
-                } catch (Exception error) {
-                    sendStatus("أوقفت محرك الصوت، لكن تعذر إيقاف خدمة الخلفية: " +
-                        error.getClass().getSimpleName());
-                }
+                activity.stopService(new Intent(activity, ArtherWakeService.class)); getCapabilities(); sendStatus("تم إيقاف الاستماع الصوتي");
             });
         }
-
-        void beginListening() {
-            activity.runOnUiThread(() -> {
-                if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
-                    activity.stopService(new Intent(activity, ArtherWakeService.class));
-                    sendStatus("التعرف على الصوت غير متاح");
-                    return;
-                }
-                // Recreate a clean recognizer instance for each listening session.
-                if (recognizer != null) {
-                    try { recognizer.cancel(); } catch (Exception ignored) {}
-                    try { recognizer.destroy(); } catch (Exception ignored) {}
-                    recognizer = null;
-                }
-
-                // Prefer Google's installed recognition service when available, then use
-                // Android's configured default provider as a fallback.
-                android.content.ComponentName selectedService = null;
-                Intent serviceQuery = new Intent(android.speech.RecognitionService.SERVICE_INTERFACE);
-                List<ResolveInfo> recognitionServices = activity.getPackageManager()
-                    .queryIntentServices(serviceQuery, PackageManager.MATCH_ALL);
-                for (ResolveInfo info : recognitionServices) {
-                    if (!forceDefaultRecognitionService && info.serviceInfo != null &&
-                        "com.google.android.googlequicksearchbox".equals(info.serviceInfo.packageName)) {
-                        selectedService = new android.content.ComponentName(
-                            info.serviceInfo.packageName, info.serviceInfo.name);
-                        break;
-                    }
-                }
-                try {
-                    recognizer = selectedService != null
-                        ? SpeechRecognizer.createSpeechRecognizer(activity, selectedService)
-                        : SpeechRecognizer.createSpeechRecognizer(activity);
-                } catch (Exception providerError) {
-                    recognizer = SpeechRecognizer.createSpeechRecognizer(activity);
-                }
-
-                recognizer.setRecognitionListener(new RecognitionListener() {
-                    @Override public void onReadyForSpeech(Bundle params) { sendStatus("أنا أستمع إليك..."); getCapabilities(); }
-                    @Override public void onBeginningOfSpeech() {}
-                    @Override public void onRmsChanged(float value) {}
-                    @Override public void onBufferReceived(byte[] buffer) {}
-                    @Override public void onEndOfSpeech() { sendStatus("أحلل كلامك..."); }
-                    @Override public void onError(int error) {
-                        String reason;
-                        if (error == 11) forceDefaultRecognitionService = true;
-                        switch (error) {
-                            case SpeechRecognizer.ERROR_AUDIO:
-                                reason = "مشكلة في الميكروفون أو مسار الصوت";
-                                break;
-                            case SpeechRecognizer.ERROR_CLIENT:
-                                reason = "توقف محرك التعرف عن العمل";
-                                break;
-                            case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
-                                reason = "إذن الميكروفون غير ممنوح. اسمح لـ ARTHER باستخدام الميكروفون";
-                                break;
-                            case SpeechRecognizer.ERROR_NETWORK:
-                                reason = "تعذر الاتصال بخدمة التعرف على الصوت. تحقق من الإنترنت";
-                                break;
-                            case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
-                                reason = "انتهت مهلة الاتصال بخدمة التعرف على الصوت";
-                                break;
-                            case SpeechRecognizer.ERROR_NO_MATCH:
-                                reason = "لم أتعرف على كلمات واضحة. اقترب من الميكروفون وتكلم بوضوح";
-                                break;
-                            case SpeechRecognizer.ERROR_RECOGNIZER_BUSY:
-                                reason = "الميكروفون مشغول بتطبيق آخر. أغلق التطبيق الذي يستخدمه";
-                                break;
-                            case SpeechRecognizer.ERROR_SERVER:
-                                reason = "خدمة التعرف على الصوت لا تستجيب حالياً";
-                                break;
-                            case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
-                                reason = "لم أسمع كلاماً. قل آرثر بعد بدء الاستماع مباشرة";
-                                break;
-                            case 11:
-                                reason = "انقطع الاتصال بمحرك التعرف على الكلام. أعد تشغيل خدمة Google للتعرف على الكلام وتحقق من اتصال الإنترنت";
-                                break;
-                            case 12:
-                            case 13:
-                                reason = "لغة التعرف غير مدعومة أو غير محمّلة. تحقق من لغات تطبيق Google أو جرّب الفرنسية";
-                                break;
-                            default:
-                                reason = "خطأ غير معروف في التعرف على الصوت";
-                                break;
-                        }
-                        sendStatus("تعذر سماع الأمر: " + reason + " (رمز " + error + ")");
-                    }
-                    @Override public void onResults(Bundle results) {
-                        ArrayList<String> matches = results == null
-                            ? null
-                            : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                        // Always notify the web app. An empty recognition result must
-                        // re-arm foreground wake-word listening instead of leaving it stuck.
-                        String transcript = matches != null && !matches.isEmpty()
-                            ? matches.get(0)
-                            : "";
-                        String safe = JSONObject.quote(transcript);
-                        webView.post(() -> webView.evaluateJavascript(
-                            "if(window.ArtherVoiceResult){window.ArtherVoiceResult(" + safe + ");}",
-                            null
-                        ));
-                    }
-                    @Override public void onPartialResults(Bundle b) {}
-                    @Override public void onEvent(int e, Bundle b) {}
-                });
-                Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, preferredLanguageTag());
-                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, preferredLanguageTag());
-                intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-                intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
-                intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, activity.getPackageName());
-                try {
-                    recognizer.startListening(intent);
-                } catch (Exception startError) {
-                    sendStatus("تعذر تشغيل خدمة التعرف على الصوت: " + startError.getClass().getSimpleName());
-                    try { recognizer.destroy(); } catch (Exception ignored) {}
-                    recognizer = null;
-                }
-            });
-        }
-
         @JavascriptInterface
         public void setFlash(String state) {
             activity.runOnUiThread(() -> {
@@ -575,6 +470,7 @@ public class MainActivity extends BridgeActivity {
                 if (text == null || text.trim().isEmpty()) return;
                 if (tts != null && ttsReady) {
                     pendingSpeech = null;
+                    pauseVoiceService();
                     tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ARTHER_REPLY");
                 } else {
                     pendingSpeech = text;
@@ -1127,7 +1023,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener);
-        stopService(new Intent(this, ArtherWakeService.class));
+        if (voiceReceiverRegistered) {
+            try { unregisterReceiver(voiceReceiver); } catch (Exception ignored) {}
+            voiceReceiverRegistered = false;
+        }
         if (artherBridge != null) {
             if (artherBridge.recognizer != null) artherBridge.recognizer.destroy();
             if (artherBridge.tts != null) artherBridge.tts.shutdown();
