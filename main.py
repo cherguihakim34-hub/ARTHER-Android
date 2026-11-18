@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from agent_core import run_agent
 from memory_store import init_memory, close_memory
+from safe_experiment import ExperimentError, run_experiment
 
 APP_NAME = "ARTHER"
 VERSION = "3.2.0"
@@ -137,10 +138,13 @@ async def agent(request: AgentRequest):
 
 @app.post("/api/experiment")
 async def experiment(request: ExperimentRequest):
-    raise HTTPException(
-        status_code=501,
-        detail=(
-            "Secure isolated Python execution is not installed yet. "
-            "Remote execution remains disabled."
-        )
-    )
+    """Run bounded numerical simulations in ARTHER's safe DSL."""
+    try:
+        result = run_experiment(request.code)
+        return {
+            "agent": APP_NAME,
+            "version": VERSION,
+            **result,
+        }
+    except ExperimentError as error:
+        raise HTTPException(status_code=400, detail=str(error))
