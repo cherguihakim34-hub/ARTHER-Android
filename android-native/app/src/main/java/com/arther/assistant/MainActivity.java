@@ -176,7 +176,7 @@ public class MainActivity extends BridgeActivity {
                     activity.getSystemService(android.content.Context.POWER_SERVICE);
                 c.put("batteryOptimizationIgnored", android.os.Build.VERSION.SDK_INT < 23 ||
                     (power != null && power.isIgnoringBatteryOptimizations(activity.getPackageName())));
-                c.put("voiceServiceRunning", ArtherWakeService.isRunning);
+                c.put("voiceServiceRunning", ArtherWakeService.isRunning && !ArtherWakeService.isPaused);
                 c.put("speechRecognitionActive", ArtherWakeService.isListening);
                 c.put("speechRecognitionAvailable", SpeechRecognizer.isRecognitionAvailable(activity));
                 c.put("textToSpeechReady", ttsReady);
