@@ -351,6 +351,9 @@ public class MainActivity extends BridgeActivity {
         }
         @JavascriptInterface
         public void pauseListening() { activity.runOnUiThread(this::pauseVoiceService); }
+
+        @JavascriptInterface
+        public void resumeListening() { activity.runOnUiThread(this::resumeVoiceService); }
         @JavascriptInterface
         public void stopListening() {
             activity.runOnUiThread(() -> {
