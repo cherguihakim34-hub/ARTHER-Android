@@ -306,7 +306,7 @@ public class MainActivity extends BridgeActivity {
                 if (ArtherWakeService.isRunning) {
                     try {
                         Intent service = new Intent(activity, ArtherWakeService.class);
-                        service.putExtra(ArtherWakeService.EXTRA_LANGUAGE, selected);
+                        service.putExtra(ArtherWakeService.EXTRA_LANGUAGE, preferredLanguageTag());
                         if (android.os.Build.VERSION.SDK_INT >= 26) activity.startForegroundService(service);
                         else activity.startService(service);
                     } catch (Exception ignored) {}
@@ -333,7 +333,7 @@ public class MainActivity extends BridgeActivity {
                 }
                 try {
                     Intent service = new Intent(activity, ArtherWakeService.class);
-                    service.putExtra(ArtherWakeService.EXTRA_LANGUAGE, speechLanguageOverride);
+                    service.putExtra(ArtherWakeService.EXTRA_LANGUAGE, preferredLanguageTag());
                     if (android.os.Build.VERSION.SDK_INT >= 26) activity.startForegroundService(service); else activity.startService(service);
                     sendStatus("جارٍ تشغيل الاستماع الصوتي...");
                 } catch (Exception error) { sendStatus("تعذر تشغيل خدمة الاستماع: " + error.getClass().getSimpleName()); }
