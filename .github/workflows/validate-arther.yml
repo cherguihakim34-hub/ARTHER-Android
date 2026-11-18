@@ -47,6 +47,7 @@ jobs:
           manifest = files[0].read_text()
           required = [
               "android.permission.RECORD_AUDIO",
+              "android.permission.MODIFY_AUDIO_SETTINGS",
               "android.permission.FOREGROUND_SERVICE_MICROPHONE",
               "android.permission.WAKE_LOCK",
               "com.arther.assistant.ArtherWakeService",
