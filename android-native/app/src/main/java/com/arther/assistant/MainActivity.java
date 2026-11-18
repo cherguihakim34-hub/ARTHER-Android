@@ -307,6 +307,14 @@ public class MainActivity extends BridgeActivity {
             final String selected = value;
             activity.runOnUiThread(() -> {
                 speechLanguageOverride = selected;
+                if (ArtherWakeService.isRunning) {
+                    try {
+                        Intent service = new Intent(activity, ArtherWakeService.class);
+                        service.putExtra(ArtherWakeService.EXTRA_LANGUAGE, selected);
+                        if (android.os.Build.VERSION.SDK_INT >= 26) activity.startForegroundService(service);
+                        else activity.startService(service);
+                    } catch (Exception ignored) {}
+                }
                 if (tts != null && ttsReady) {
                     tts.setPitch(0.82f);
                     int result = tts.setLanguage(Locale.forLanguageTag(preferredLanguageTag()));
