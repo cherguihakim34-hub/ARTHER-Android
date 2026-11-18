@@ -144,7 +144,7 @@ public class MainActivity extends BridgeActivity {
                             ));
                         }
                         @Override public void onError(String utteranceId) {
-                            resumeVoiceService();
+                            resumeVoiceServiceIfEnabled();
                             webView.post(() -> webView.evaluateJavascript(
                                 "if(window.ArtherSpeechFinished){window.ArtherSpeechFinished();}", null
                             ));
