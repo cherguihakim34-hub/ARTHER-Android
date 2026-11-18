@@ -765,7 +765,7 @@ async function runArther() {
   }
 }
 
-const EXPERIMENT_EXAMPLE = "position = 0\\nvelocity = 2\\nresults = []\\nfor step in range(5):\\n    position = position + velocity\\n    results.append(position)\\nprint(results)";
+const EXPERIMENT_EXAMPLE = "position = 0\\nvelocity = 2\\nfor step in range(5):\\n    position = position + velocity\\n    results.append(position)\\nprint(results)";
 
 async function runExperiment() {
   const editor = $("experimentCode");
