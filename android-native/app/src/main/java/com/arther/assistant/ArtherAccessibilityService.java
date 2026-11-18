@@ -14,15 +14,89 @@ import java.util.Locale;
 public class ArtherAccessibilityService extends AccessibilityService {
 
     private static ArtherAccessibilityService instance;
+    private volatile String cachedScreenText = "";
+    private volatile String cachedPackageName = "";
+    private long lastSnapshotAt = 0L;
 
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
         instance = this;
+        refreshScreenSnapshot();
     }
 
     @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {}
+    public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (event == null) return;
+        int type = event.getEventType();
+        if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
+            type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
+            type == AccessibilityEvent.TYPE_VIEW_SCROLLED ||
+            type == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            long now = android.os.SystemClock.uptimeMillis();
+            if (now - lastSnapshotAt >= 250L) {
+                lastSnapshotAt = now;
+                refreshScreenSnapshot();
+            }
+        }
+    }
+
+    private void refreshScreenSnapshot() {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null) {
+            cachedScreenText = "";
+            cachedPackageName = "";
+            return;
+        }
+        StringBuilder out = new StringBuilder();
+        appendVisibleText(root, out, 0, new int[]{0});
+        cachedScreenText = out.toString().trim();
+        CharSequence pkg = root.getPackageName();
+        cachedPackageName = pkg == null ? "" : pkg.toString();
+    }
+
+    private void appendVisibleText(
+        AccessibilityNodeInfo node,
+        StringBuilder out,
+        int depth,
+        int[] count
+    ) {
+        if (node == null || depth > 18 || count[0] >= 140 || out.length() >= 6000) return;
+        count[0]++;
+        if (!node.isVisibleToUser()) return;
+
+        // Never collect text from editable controls: this avoids reading
+        // typed drafts, search queries, and other potentially sensitive input.
+        if (!node.isPassword() && !node.isEditable()) {
+            CharSequence text = node.getText();
+            CharSequence desc = node.getContentDescription();
+            appendUniqueLine(out, text);
+            if (desc != null && (text == null || !desc.toString().contentEquals(text)))
+                appendUniqueLine(out, desc);
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            if (count[0] >= 140 || out.length() >= 6000) break;
+            appendVisibleText(node.getChild(i), out, depth + 1, count);
+        }
+    }
+
+    private void appendUniqueLine(StringBuilder out, CharSequence value) {
+        if (value == null) return;
+        String line = value.toString().replaceAll("\\s+", " ").trim();
+        if (line.isEmpty() || out.indexOf(line) >= 0) return;
+        if (out.length() > 0) out.append('\n');
+        out.append(line);
+    }
+
+    public static String getCachedScreenText() {
+        ArtherAccessibilityService service = instance;
+        return service == null ? "" : service.cachedScreenText;
+    }
+
+    public static String getCachedPackageName() {
+        ArtherAccessibilityService service = instance;
+        return service == null ? "" : service.cachedPackageName;
+    }
 
     @Override
     public void onInterrupt() {}
@@ -127,15 +201,18 @@ public class ArtherAccessibilityService extends AccessibilityService {
         AccessibilityNodeInfo root = getRootInActiveWindow();
 
         return root != null &&
-            findAndActNode(root, text.toLowerCase(Locale.ROOT), longClick);
+            findAndActNode(root, text.toLowerCase(Locale.ROOT), longClick, 0, new int[]{0});
     }
 
     private boolean findAndActNode(
         AccessibilityNodeInfo node,
         String wanted,
-        boolean longClick
+        boolean longClick,
+        int depth,
+        int[] visited
     ) {
-        if (node == null) return false;
+        if (node == null || depth > 30 || visited[0] >= 500) return false;
+        visited[0]++;
 
         CharSequence label = node.getText();
         CharSequence description = node.getContentDescription();
@@ -155,8 +232,9 @@ public class ArtherAccessibilityService extends AccessibilityService {
             }
 
             AccessibilityNodeInfo parent = node.getParent();
+            int parentDepth = 0;
 
-            while (parent != null) {
+            while (parent != null && parentDepth++ < 30) {
                 if (parent.isClickable() ||
                     (longClick && parent.isLongClickable())) {
                     if (parent.performAction(action)) return true;
@@ -169,7 +247,7 @@ public class ArtherAccessibilityService extends AccessibilityService {
             AccessibilityNodeInfo child = node.getChild(i);
 
             if (child != null &&
-                findAndActNode(child, wanted, longClick)) {
+                findAndActNode(child, wanted, longClick, depth + 1, visited)) {
                 return true;
             }
         }
@@ -231,12 +309,38 @@ public class ArtherAccessibilityService extends AccessibilityService {
     }
 
     private boolean scroll(boolean down) {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        int action = down
+            ? AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+            : AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD;
+
+        // Prefer the app's own scroll container so nested lists and web views
+        // receive a semantic scroll action before using a screen-wide gesture.
+        if (root != null && scrollNode(root, action, 0, new int[]{0})) return true;
+
         float x = getResources().getDisplayMetrics().widthPixels / 2f;
         float h = getResources().getDisplayMetrics().heightPixels;
-
         return swipe(
             x + "," + (down ? h * 0.78f : h * 0.28f) + "," +
             x + "," + (down ? h * 0.28f : h * 0.78f) + ",450"
         );
+    }
+
+    private boolean scrollNode(
+        AccessibilityNodeInfo node,
+        int action,
+        int depth,
+        int[] visited
+    ) {
+        if (node == null || depth > 30 || visited[0] >= 500 ||
+            !node.isVisibleToUser()) return false;
+        visited[0]++;
+        if (node.isScrollable() && node.performAction(action)) return true;
+
+        for (int i = 0; i < node.getChildCount() && visited[0] < 500; i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null && scrollNode(child, action, depth + 1, visited)) return true;
+        }
+        return false;
     }
 }

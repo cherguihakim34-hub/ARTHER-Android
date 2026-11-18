@@ -26,26 +26,93 @@
       <p>مساعدك الذكي الصوتي والشخصي</p>
     </section>
 
+    <section class="chat-panel" aria-label="سجل المحادثة">
+      <div class="chat-heading">
+        <h2>محادثتك مع ARTHER</h2>
+        <button id="clearChat" class="secondary" type="button">مسح المحادثة</button>
+      </div>
+      <div id="chatMessages" class="chat-messages" aria-live="polite">
+        <p class="chat-empty">ستظهر إجابات ARTHER هنا. يمكنك التحدث أو الكتابة.</p>
+      </div>
+    </section>
+
     <section id="report" class="report hidden"></section>
 
     <section class="workspace">
+      <label for="language">لغة الأوامر والصوت</label>
+      <select id="language" aria-label="لغة الأوامر والصوت">
+        <option value="auto">تلقائي حسب الهاتف</option>
+        <option value="ar">العربية</option>
+        <option value="fr">Français</option>
+        <option value="en">English</option>
+      </select>
       <label for="question">أعطِ أمرك إلى ARTHER</label>
       <textarea id="question" rows="4"
-        placeholder="اكتب أمرك أو اضغط على الميكروفون..."></textarea>
+        placeholder="اكتب رسالتك هنا... ويمكنك أيضاً استخدام الميكروفون"></textarea>
 
       <div class="actions">
         <button id="listen" class="mic">🎙️ استمع إليّ</button>
-        <button id="run" class="primary">تنفيذ الأمر</button>
-        <button id="stopVoice" class="secondary">إيقاف الصوت</button>
+        <button id="run" class="primary">إرسال / تنفيذ</button>
+        <button id="clearText" class="secondary" type="button">مسح الكتابة</button>
+        <button id="stopVoice" class="secondary">إيقاف الاستماع والصوت</button>
       </div>
 
       <div class="actions">
-        <button id="home" class="secondary">الشاشة الرئيسية</button>
+        <button id="home" class="secondary">الرئيسية</button>
         <button id="back" class="secondary">رجوع</button>
         <button id="scrollDown" class="secondary">تمرير للأسفل</button>
       </div>
+      <div class="actions tool-actions">
+        <button id="openCamera" class="secondary">الكاميرا</button>
+        <button id="openWifi" class="secondary">إعدادات Wi-Fi</button>
+        <button id="openMap" class="secondary">الخرائط</button>
+        <button id="listApps" class="secondary">التطبيقات المثبتة</button>
+        <button id="openAlarms" class="secondary">المنبه</button>
+        <button id="quickScreenshot" class="secondary">لقطة شاشة</button>
+        <button id="quickNotifications" class="secondary">الإشعارات</button>
+        <button id="quickLock" class="secondary">قفل الشاشة</button>
+        <button id="quickVolumeUp" class="secondary">رفع الصوت</button>
+        <button id="quickVolumeDown" class="secondary">خفض الصوت</button>
+        <button id="openBluetooth" class="secondary">إعدادات Bluetooth</button>
+        <button id="openDisplay" class="secondary">إعدادات الشاشة</button>
+        <button id="openSound" class="secondary">إعدادات الصوت</button>
+        <button id="openLocationSettings" class="secondary">إعدادات الموقع</button>
+        <button id="openBattery" class="secondary">البطارية</button>
+        <button id="openAppsSettings" class="secondary">إدارة التطبيقات</button>
+        <button id="openSystemSettings" class="secondary">كل الإعدادات</button>
+      </div>
 
       <p id="voiceStatus" class="status">الصوت جاهز</p>
+    </section>
+
+    <section class="experiment-panel">
+      <h2>مختبر التجارب والمحاكاة</h2>
+      <p class="hint">اكتب معادلات وخطوات محاكاة بسيطة. يعمل المحرك ضمن حدود آمنة ولا يشغّل أوامر النظام أو الملفات.</p>
+      <label for="experimentCode">كود التجربة</label>
+      <textarea id="experimentCode" rows="8" spellcheck="false" dir="ltr">position = 0
+velocity = 2
+for step in range(5):
+    position = position + velocity
+    results.append(position)
+print(results)</textarea>
+      <div class="actions">
+        <button id="runExperiment" class="primary" type="button">تشغيل المحاكاة</button>
+        <button id="resetExperiment" class="secondary" type="button">استعادة المثال</button>
+      </div>
+      <pre id="experimentOutput" class="experiment-output" aria-live="polite">نتائج التجربة ستظهر هنا.</pre>
+    </section>
+
+    <section class="permissions">
+      <h2>قدرات الهاتف والصلاحيات</h2>
+      <p id="permissionStatus" class="status">جارٍ فحص صلاحيات ARTHER...</p>
+      <div class="actions">
+        <button id="requestMic" class="secondary">إذن الميكروفون</button>
+        <button id="requestBackground" class="secondary">السماح بالعمل في الخلفية</button>
+        <button id="requestBrightness" class="secondary">إذن التحكم بالسطوع</button>
+        <button id="enableAccessibility" class="secondary">تفعيل التحكم بالشاشة</button>
+        <button id="shizuku" class="secondary">فحص / ربط Shizuku</button>
+      </div>
+      <p class="hint">لن تُفعّل الصلاحيات الحساسة إلا بموافقتك من Android. الاستماع المستمر يستهلك البطارية وقد يحتاج إلى اتصال إنترنت حسب محرك التعرف المثبّت.</p>
     </section>
 
     <footer>ARTHER · YOUR PERSONAL ASSISTANT</footer>

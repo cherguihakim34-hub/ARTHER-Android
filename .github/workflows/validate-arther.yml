@@ -1,0 +1,84 @@
+name: Validate ARTHER development branch
+
+on:
+  push:
+    branches:
+      - arther-dev
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate JavaScript syntax
+        run: node --check app.js
+
+      - name: Validate Python syntax
+        run: python -m py_compile main.py agent_core.py memory_store.py planner.py safe_experiment.py
+
+      - name: Test safe experiment engine
+        run: python -m unittest test_experiment.py
+
+      - name: Validate native XML
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          files = [
+              Path("android-native/app/src/main/AndroidManifest.xml"),
+              Path("android-native/app/src/main/res/xml/arther_accessibility.xml"),
+              Path("android-native/app/src/main/res/values/arther_strings.xml"),
+          ]
+          for path in files:
+              ET.fromstring(path.read_text(encoding="utf-8-sig").lstrip())
+              print("XML OK:", path)
+
+          manifest = files[0].read_text()
+          required = [
+              "android.permission.RECORD_AUDIO",
+              "android.permission.MODIFY_AUDIO_SETTINGS",
+              "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+              "android.permission.WAKE_LOCK",
+              "com.arther.assistant.ArtherWakeService",
+              "com.arther.assistant.ArtherAccessibilityService",
+          ]
+          missing = [item for item in required if item not in manifest]
+          if missing:
+              raise SystemExit("Missing manifest entries: " + ", ".join(missing))
+
+          for path in [
+              Path("android-native/app/src/main/java/com/arther/assistant/MainActivity.java"),
+              Path("android-native/app/src/main/java/com/arther/assistant/ArtherWakeService.java"),
+              Path("android-native/app/src/main/java/com/arther/assistant/ArtherAccessibilityService.java"),
+          ]:
+              if not path.is_file():
+                  raise SystemExit("Missing native source: " + str(path))
+          print("Native manifest and source checks passed")
+          PY
+
+      - name: Validate UI element IDs
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          html = Path("index.html").read_text()
+          ids = re.findall(r'\bid="([^"]+)"', html)
+          duplicates = sorted({item for item in ids if ids.count(item) > 1})
+          if duplicates:
+              raise SystemExit("Duplicate HTML IDs: " + ", ".join(duplicates))
+          print(f"HTML IDs OK: {len(ids)} unique IDs")
+          PY

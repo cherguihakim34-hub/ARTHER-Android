@@ -1,0 +1,244 @@
+name: Compile ARTHER Android sources
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - arther-dev
+
+concurrency:
+  group: arther-android-compile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Prepare web app
+        run: |
+          mkdir -p www
+          cp index.html style.css app.js www/
+          npm init -y
+          npm install @capacitor/core@^7 @capacitor/cli@^7 @capacitor/android@^7
+
+      - name: Validate JavaScript
+        run: node --check app.js
+
+      - name: Validate backend Python
+        run: python -m py_compile main.py agent_core.py memory_store.py planner.py safe_experiment.py
+
+      - name: Configure Capacitor
+        run: |
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.arther.assistant",
+            "appName": "ARTHER",
+            "webDir": "www"
+          }
+          EOF
+
+          npx cap add android
+          npx cap sync android
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("android/app/build.gradle")
+          s = p.read_text()
+          dependencies = [
+              '    implementation "dev.rikka.shizuku:api:13.1.5"\n',
+              '    implementation "dev.rikka.shizuku:provider:13.1.5"\n'
+          ]
+          for dependency in dependencies:
+              if dependency.strip() not in s:
+                  s = s.replace("dependencies {", "dependencies {\n" + dependency, 1)
+          # Shizuku API 13.1.5 requires Android API 24 or newer.
+          s = s.replace("minSdkVersion rootProject.ext.minSdkVersion", "minSdkVersion 24")
+          # Keep the requested ARTHER release numbering visible in Android settings.
+          s = re.sub(r"versionCode\s+\d+", "versionCode 119", s)
+          s = re.sub(r'versionName\s+"[^"]+"', 'versionName "119"', s)
+          assert re.search(r"versionCode\s+119", s), "ARTHER versionCode 119 was not configured"
+          assert re.search(r'versionName\s+"119"', s), "ARTHER versionName 119 was not configured"
+          print("Configured ARTHER Android version 119")
+          p.write_text(s)
+          PY
+
+      - name: Install native files
+        run: |
+          mkdir -p android/app/src/main/java/com/arther/assistant
+          mkdir -p android/app/src/main/res/xml
+          mkdir -p android/app/src/main/res/values
+
+          cp android-native/app/src/main/java/com/arther/assistant/MainActivity.java android/app/src/main/java/com/arther/assistant/
+          cp android-native/app/src/main/java/com/arther/assistant/ArtherWakeService.java android/app/src/main/java/com/arther/assistant/
+
+          cp android-native/app/src/main/java/com/arther/assistant/ArtherAccessibilityService.java android/app/src/main/java/com/arther/assistant/
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          files = [
+              (
+                  Path("android-native/app/src/main/res/xml/arther_accessibility.xml"),
+                  Path("android/app/src/main/res/xml/arther_accessibility.xml")
+              ),
+              (
+                  Path("android-native/app/src/main/res/values/arther_strings.xml"),
+                  Path("android/app/src/main/res/values/arther_strings.xml")
+              )
+          ]
+
+          for source, target in files:
+              content = source.read_text(encoding="utf-8-sig")
+              content = re.sub(r'^\s*<\?xml[^?]*\?>\s*', '', content)
+              content = '<?xml version="1.0" encoding="utf-8"?>\n' + content.lstrip()
+              target.write_text(content, encoding="utf-8")
+          PY
+
+      - name: Configure permissions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+
+          # Android 11+ package visibility: allow ARTHER to discover launcher apps.
+          queries = """
+              <queries>
+                  <intent>
+                      <action android:name="android.intent.action.MAIN" />
+                      <category android:name="android.intent.category.LAUNCHER" />
+                  </intent>
+                  <intent>
+                      <action android:name="android.speech.RecognitionService" />
+                  </intent>
+                  <intent>
+                      <action android:name="android.intent.action.VIEW" />
+                      <data android:scheme="geo" />
+                  </intent>
+                  <package android:name="com.google.android.youtube" />
+                  <package android:name="com.android.chrome" />
+                  <package android:name="com.whatsapp" />
+                  <package android:name="com.facebook.katana" />
+                  <package android:name="com.sec.android.app.camera" />
+                  <package android:name="com.android.settings" />
+                  <package android:name="com.google.android.apps.maps" />
+                  <package android:name="moe.shizuku.privileged.api" />
+              </queries>
+          """
+          if "<queries>" not in s:
+              s = s.replace("<application", queries + "\n    <application", 1)
+
+          permissions = [
+              '<uses-permission android:name="android.permission.INTERNET" />',
+              '<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />',
+              '<uses-permission android:name="android.permission.RECORD_AUDIO" />',
+              '<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />',
+              '<uses-permission android:name="android.permission.WAKE_LOCK" />',
+              '<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />',
+              '<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />',
+              '<uses-permission android:name="android.permission.CAMERA" />',
+              '<uses-permission android:name="android.permission.WRITE_SETTINGS" />',
+              '<uses-permission android:name="android.permission.FLASHLIGHT" />',
+              '<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />',
+              '<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
+          ]
+
+          for item in permissions:
+              if item not in s:
+                  s = s.replace(
+                      "<application",
+                      item + "\n    <application",
+                      1
+                  )
+
+          service = """
+              <service
+                  android:name="com.arther.assistant.ArtherAccessibilityService"
+                  android:label="ARTHER Phone Control"
+                  android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+                  android:exported="true">
+                  <intent-filter>
+                      <action android:name="android.accessibilityservice.AccessibilityService" />
+                  </intent-filter>
+                  <meta-data
+                      android:name="android.accessibilityservice"
+                      android:resource="@xml/arther_accessibility" />
+              </service>
+          """
+
+          if "com.arther.assistant.ArtherAccessibilityService" not in s:
+              s = s.replace("</application>", service + "\n</application>")
+
+          wake_service = """
+              <service
+                  android:name="com.arther.assistant.ArtherWakeService"
+                  android:exported="false"
+                  android:foregroundServiceType="microphone" />
+          """
+          if "com.arther.assistant.ArtherWakeService" not in s:
+              s = s.replace("</application>", wake_service + "\n</application>")
+          provider = """
+              <provider
+                  android:name="rikka.shizuku.ShizukuProvider"
+                  android:authorities="${applicationId}.shizuku"
+                  android:multiprocess="false"
+                  android:enabled="true"
+                  android:exported="true"
+                  android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+          """
+          if "rikka.shizuku.ShizukuProvider" not in s:
+              s = s.replace("</application>", provider + "\n</application>")
+
+          assert "android.permission.FOREGROUND_SERVICE" in s
+          assert "android.permission.WAKE_LOCK" in s
+          assert "android.permission.FOREGROUND_SERVICE_MICROPHONE" in s
+          assert "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" in s
+          assert "com.arther.assistant.ArtherWakeService" in s
+          assert "android.permission.ACCESS_FINE_LOCATION" in s
+          assert "android.permission.ACCESS_COARSE_LOCATION" in s
+          assert "rikka.shizuku.ShizukuProvider" in s
+          assert "android.speech.RecognitionService" in s
+          print("Verified location, Shizuku and speech-recognition manifest entries")
+          p.write_text(s)
+          PY
+
+      - name: Validate XML
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          files = [
+              Path("android/app/src/main/res/xml/arther_accessibility.xml"),
+              Path("android/app/src/main/res/values/arther_strings.xml"),
+              Path("android/app/src/main/AndroidManifest.xml")
+          ]
+
+          for p in files:
+              ET.parse(p)
+              print("OK:", p)
+          PY
+
+      - name: Compile native Android sources (no APK packaging)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew compileDebugJavaWithJavac
