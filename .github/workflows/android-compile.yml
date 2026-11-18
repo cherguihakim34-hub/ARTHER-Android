@@ -40,7 +40,7 @@ jobs:
         run: node --check app.js
 
       - name: Validate backend Python
-        run: python -m py_compile main.py agent_core.py memory_store.py planner.py
+        run: python -m py_compile main.py agent_core.py memory_store.py planner.py safe_experiment.py
 
       - name: Configure Capacitor
         run: |
