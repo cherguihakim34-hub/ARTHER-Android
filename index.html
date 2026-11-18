@@ -85,6 +85,24 @@
       <p id="voiceStatus" class="status">الصوت جاهز</p>
     </section>
 
+    <section class="experiment-panel">
+      <h2>مختبر التجارب والمحاكاة</h2>
+      <p class="hint">اكتب معادلات وخطوات محاكاة بسيطة. يعمل المحرك ضمن حدود آمنة ولا يشغّل أوامر النظام أو الملفات.</p>
+      <label for="experimentCode">كود التجربة</label>
+      <textarea id="experimentCode" rows="8" spellcheck="false" dir="ltr">position = 0
+velocity = 2
+results = []
+for step in range(5):
+    position = position + velocity
+    results.append(position)
+print(results)</textarea>
+      <div class="actions">
+        <button id="runExperiment" class="primary" type="button">تشغيل المحاكاة</button>
+        <button id="resetExperiment" class="secondary" type="button">استعادة المثال</button>
+      </div>
+      <pre id="experimentOutput" class="experiment-output" aria-live="polite">نتائج التجربة ستظهر هنا.</pre>
+    </section>
+
     <section class="permissions">
       <h2>قدرات الهاتف والصلاحيات</h2>
       <p id="permissionStatus" class="status">جارٍ فحص صلاحيات ARTHER...</p>
