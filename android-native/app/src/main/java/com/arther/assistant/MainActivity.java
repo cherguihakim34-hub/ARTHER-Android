@@ -122,6 +122,9 @@ public class MainActivity extends BridgeActivity {
         private String speechLanguageOverride = "auto";
         private boolean ttsReady = false;
         private String pendingSpeech;
+        // Native speech output may resume recognition only while the user-enabled
+        // wake-word session is still active.
+        private volatile boolean voiceWakeEnabled = false;
 
         ArtherBridge(MainActivity activity, WebView webView) {
             this.activity = activity;
@@ -135,7 +138,7 @@ public class MainActivity extends BridgeActivity {
                     tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                         @Override public void onStart(String utteranceId) {}
                         @Override public void onDone(String utteranceId) {
-                            resumeVoiceService();
+                            resumeVoiceServiceIfEnabled();
                             webView.post(() -> webView.evaluateJavascript(
                                 "if(window.ArtherSpeechFinished){window.ArtherSpeechFinished();}", null
                             ));
@@ -328,15 +331,20 @@ public class MainActivity extends BridgeActivity {
         public void startListening() {
             activity.runOnUiThread(() -> {
                 if (activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    voiceWakeEnabled = false;
                     sendStatus("أحتاج إذن الميكروفون. اسمح لـ ARTHER باستخدام الميكروفون.");
                     activity.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 701); return;
                 }
                 try {
+                    voiceWakeEnabled = true;
                     Intent service = new Intent(activity, ArtherWakeService.class);
                     service.putExtra(ArtherWakeService.EXTRA_LANGUAGE, preferredLanguageTag());
                     if (android.os.Build.VERSION.SDK_INT >= 26) activity.startForegroundService(service); else activity.startService(service);
                     sendStatus("جارٍ تشغيل الاستماع الصوتي...");
-                } catch (Exception error) { sendStatus("تعذر تشغيل خدمة الاستماع: " + error.getClass().getSimpleName()); }
+                } catch (Exception error) {
+                    voiceWakeEnabled = false;
+                    sendStatus("تعذر تشغيل خدمة الاستماع: " + error.getClass().getSimpleName());
+                }
             });
         }
 
@@ -353,6 +361,9 @@ public class MainActivity extends BridgeActivity {
                 Intent intent = new Intent(activity, ArtherWakeService.class); intent.setAction(ArtherWakeService.ACTION_RESUME); activity.startService(intent);
             }} catch (Exception ignored) {}
         }
+        private void resumeVoiceServiceIfEnabled() {
+            if (voiceWakeEnabled) resumeVoiceService();
+        }
         @JavascriptInterface
         public void pauseListening() { activity.runOnUiThread(this::pauseVoiceService); }
 
@@ -361,6 +372,7 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public void stopListening() {
             activity.runOnUiThread(() -> {
+                voiceWakeEnabled = false;
                 activity.stopService(new Intent(activity, ArtherWakeService.class)); getCapabilities(); sendStatus("تم إيقاف الاستماع الصوتي");
             });
         }
