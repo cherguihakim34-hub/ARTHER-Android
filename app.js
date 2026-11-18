@@ -307,7 +307,8 @@ window.ArtherCapabilities = function(raw) {
     const c = typeof raw === "string" ? JSON.parse(raw) : raw;
     const lines = [
       "الميكروفون: " + (c.microphone ? "مسموح" : "يحتاج إذناً"),
-      "الاستماع بالخلفية: " + (c.voiceServiceRunning ? "الخدمة تعمل" : "غير نشط"),
+      "خدمة الصوت بالخلفية: " + (c.voiceServiceRunning ? "نشطة" : "متوقفة"),
+      "التعرف الآن: " + (c.speechRecognitionActive ? "يستمع" : "بانتظار جلسة صوتية"),
       "التعرف على الكلام: " + (c.speechRecognitionAvailable ? "متاح" : "غير متاح"),
       "الصوت الناطق: " + (c.textToSpeechReady ? "جاهز" : "جارٍ التهيئة أو غير متاح"),
       "الموقع: " + (!c.location ? "يحتاج إذناً" : (c.locationPrecise ? "دقيق" : "تقريبي فقط")),
