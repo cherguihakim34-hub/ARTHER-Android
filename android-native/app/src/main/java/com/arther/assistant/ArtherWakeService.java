@@ -70,8 +70,9 @@ public class ArtherWakeService extends Service {
         if (intent != null) {
             String selected = intent.getStringExtra(EXTRA_LANGUAGE);
             if (selected != null) {
-                String nextLanguage = "fr".equals(selected) ? "fr-FR" :
-                    ("en".equals(selected) ? "en-US" : "ar-SA");
+                String normalized = selected.trim().toLowerCase(Locale.ROOT);
+                String nextLanguage = normalized.startsWith("fr") ? "fr-FR" :
+                    (normalized.startsWith("en") ? "en-US" : "ar-SA");
                 if (!nextLanguage.equals(languageTag)) {
                     languageTag = nextLanguage;
                     if (recognizer != null) {
