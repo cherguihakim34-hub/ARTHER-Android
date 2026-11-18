@@ -42,6 +42,22 @@ class SafeExperimentTests(unittest.TestCase):
         with self.assertRaises(ExperimentError):
             run_experiment("for i in range(5001):\n    print(i)")
 
+    def test_reserved_names_cannot_be_overwritten(self):
+        with self.assertRaises(ExperimentError):
+            run_experiment("results = []")
+
+    def test_large_string_allocation_is_rejected(self):
+        with self.assertRaises(ExperimentError):
+            run_experiment('huge = "x" * 1000000000')
+
+    def test_nested_loops_obey_operation_budget(self):
+        with self.assertRaises(ExperimentError):
+            run_experiment(
+                "for i in range(5000):\\n"
+                "    for j in range(5000):\\n"
+                "        pass\\n"
+            )
+
     def test_empty_source_is_rejected(self):
         with self.assertRaises(ExperimentError):
             run_experiment("   ")
