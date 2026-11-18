@@ -55,10 +55,13 @@ public class ArtherWakeService extends Service {
         if (ACTION_PAUSE.equals(action)) {
             paused = true;
             stopRecognition();
+            // Do not keep the CPU awake while text-to-speech is playing.
+            releaseCpuWakeLock();
             return START_NOT_STICKY;
         }
         if (ACTION_RESUME.equals(action)) {
             paused = false;
+            if (isRunning) acquireCpuWakeLock();
             startRecognition();
             return START_NOT_STICKY;
         }
